@@ -149,9 +149,13 @@ The initial work focuses on foundations first: low-coupling, high-cohesion modul
 - Keep logs concise because Screeps console output is runtime-visible and CPU-sensitive.
 ## Comments
 - Add comments around Screeps-specific runtime constraints, source-map limitations, and test global injection. Examples live in `src/main.ts`, `src/utils/ErrorMapper.ts`, and `test/setup-mocha.js`.
+- 在新增或修改函数时，为非显而易见的职责、阶段边界、输入/输出约束补充简短中文注释；尤其是 kernel stage、Memory migration、validation、command routing、策略决策等后续实现阶段的关键逻辑。
+- 复杂逻辑块应在代码前用 1-2 行中文说明“为什么这样做”或“这个分支保护什么约束”，而不是逐行翻译代码。
 - Use comments to explain why a lint or type escape is required. `test/unit/main.test.ts` documents `@ts-ignore` when assigning `Game` and `Memory` onto `global`.
 - Avoid comments that restate obvious assignments. Existing useful comments explain source-map CPU cost in `src/utils/ErrorMapper.ts` and game memory typing caveats in `src/main.ts`.
+- 注释应保持简短、准确，并随实现变更同步更新；不要添加与代码行为脱节的长段说明。
 - Use JSDoc for public utility APIs with non-obvious behavior, parameters, returns, and warnings. `src/utils/ErrorMapper.ts` documents `sourceMappedStackTrace(error: Error | string): string`.
+- 公共导出函数或后续会被其他模块调用的工具函数，如果语义不直观，优先用中文 JSDoc/TSDoc 描述用途、参数约束、返回结果和 Screeps 运行时注意事项。
 - Ambient Screeps type declarations in `src/main.ts` use block comments instead of formal TSDoc because they document global merge behavior rather than exported APIs.
 ## Function Design
 ## Module Design
