@@ -6,6 +6,7 @@ import { RoleName } from "constants/roles";
 import { RuntimeEnvironment, ShardName } from "constants/runtime";
 import { StrategyMode } from "constants/strategy";
 import { validateRoomName } from "validation/roomName";
+import { validateRuntimeEnvironment, validateShardName } from "validation/runtime";
 
 describe("constants|validation", () => {
   it("exposes stable runtime constants", () => {
@@ -32,6 +33,22 @@ describe("constants|validation", () => {
     assert.deepEqual(validateRoomName("   "), {
       ok: false,
       reason: "Room name must be a non-empty string"
+    });
+  });
+
+  it("accepts known shard and environment values", () => {
+    assert.deepEqual(validateShardName(" sim "), { ok: true, value: ShardName.sim });
+    assert.deepEqual(validateRuntimeEnvironment("sim"), { ok: true, value: RuntimeEnvironment.sim });
+  });
+
+  it("rejects unknown shard and environment values with reasons", () => {
+    assert.deepEqual(validateShardName("not-a-shard"), {
+      ok: false,
+      reason: "Shard name must be one of: sim, shard0, shard1, shard2, shard3, private, unknown"
+    });
+    assert.deepEqual(validateRuntimeEnvironment("staging"), {
+      ok: false,
+      reason: "Runtime environment must be one of: sim, world, private, unknown"
     });
   });
 });
