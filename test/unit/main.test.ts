@@ -29,11 +29,11 @@ describe("main", () => {
     assert.isTrue(typeof loop === "function");
   });
 
-  it("should return void when called with no context", () => {
+  it("should return void", () => {
     assert.isUndefined(loop());
   });
 
-  it("runs the kernel lifecycle when called", () => {
+  it("Automatically delete memory of missing creeps through the kernel cleanup stage", () => {
     consoleLog = sinon.stub(console, "log");
     Memory.creeps.persistValue = "any value";
     Memory.creeps.notPersistValue = "any value";
@@ -44,5 +44,13 @@ describe("main", () => {
     assert.isDefined(Memory.creeps.persistValue);
     assert.isUndefined(Memory.creeps.notPersistValue);
     assert.isTrue(consoleLog.calledOnceWith("Cleaned up 1 stale creep memory entries"));
+  });
+
+  it("does not emit the starter Current game tick log", () => {
+    consoleLog = sinon.stub(console, "log");
+
+    loop();
+
+    assert.isFalse(consoleLog.calledWithMatch("Current game tick"));
   });
 });
