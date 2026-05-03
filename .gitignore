@@ -90,3 +90,9 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+
+# ai
+.claude
+.codex
+.opencode
