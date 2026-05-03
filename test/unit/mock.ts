@@ -12,6 +12,7 @@ export const Game: {
 
 export const Memory: {
   creeps: { [name: string]: any };
+  [key: string]: any;
 } = {
   creeps: {}
 };
