@@ -40,8 +40,8 @@ export interface ProcessesMemory {
 }
 
 export interface CommandsMemory {
-  queue: Array<Record<string, unknown>>;
-  history: Array<Record<string, unknown>>;
+  queue: Record<string, unknown>[];
+  history: Record<string, unknown>[];
 }
 
 export interface StatsMemory {
@@ -106,5 +106,13 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
 }
 
 declare global {
-  interface Memory extends ProjectMemoryShape {}
+  interface Memory {
+    version: number;
+    runtime: RuntimeMemory;
+    config: ProjectConfigMemory;
+    colonies: ColoniesMemory;
+    processes: ProcessesMemory;
+    commands: CommandsMemory;
+    stats: StatsMemory;
+  }
 }
