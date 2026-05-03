@@ -1,4 +1,5 @@
 import { ErrorMapper } from "utils/ErrorMapper";
+import { Kernel } from "runtime/Kernel";
 
 declare global {
   /*
@@ -10,11 +11,6 @@ declare global {
     Interfaces matching on name from @types/screeps will be merged. This is how you can extend the 'built-in' interfaces from @types/screeps.
   */
   // Memory extension samples
-  interface Memory {
-    uuid: number;
-    log: any;
-  }
-
   interface CreepMemory {
     role: string;
     room: string;
@@ -22,20 +18,11 @@ declare global {
   }
 
 }
-// Syntax for adding properties to `global` (ex "global.log")
-declare const global: {
-  log: any;
-}
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
-export const loop = ErrorMapper.wrapLoop(() => {
-  console.log(`Current game tick is ${Game.time}`);
+const kernel = new Kernel();
 
-  // Automatically delete memory of missing creeps
-  for (const name in Memory.creeps) {
-    if (!(name in Game.creeps)) {
-      delete Memory.creeps[name];
-    }
-  }
+export const loop = ErrorMapper.wrapLoop(() => {
+  kernel.run();
 });

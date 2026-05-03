@@ -4,7 +4,7 @@ import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
 import { Game, Memory } from "./mock";
 
-describe("kernel", () => {
+describe("cleanup|kernel runtime kernel", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   beforeEach(() => {
@@ -84,5 +84,41 @@ describe("kernel", () => {
     ]);
     assert.include(result.executedStages, "cleanup");
     assert.isTrue(consoleLog.calledOnceWith("Kernel stage refreshServices failed: refresh failed"));
+  });
+
+  it("runs dead creep memory cleanup in the cleanup stage", () => {
+    consoleLog = sinon.stub(console, "log");
+    const observedStages: LifecycleStageName[] = [];
+    const stages: LifecycleStageOverrides = {};
+    Memory.creeps.persistValue = "any value";
+    Memory.creeps.notPersistValue = "any value";
+    Game.creeps.persistValue = "any value";
+
+    for (const stageName of KERNEL_STAGE_ORDER) {
+      if (stageName === "runSpawning") {
+        stages[stageName] = () => {
+          observedStages.push(stageName);
+          assert.isDefined(Memory.creeps.notPersistValue);
+        };
+      } else if (stageName !== "cleanup") {
+        stages[stageName] = () => observedStages.push(stageName);
+      }
+    }
+
+    const result = new Kernel({ stages }).run();
+
+    assert.isTrue(result.ok);
+    assert.deepEqual(result.executedStages, [...KERNEL_STAGE_ORDER]);
+    assert.deepEqual(observedStages, [
+      "migrate",
+      "refreshServices",
+      "detectEnvironmentBootstrap",
+      "runColoniesAndProcesses",
+      "runSpawning",
+      "flushStats"
+    ]);
+    assert.isDefined(Memory.creeps.persistValue);
+    assert.isUndefined(Memory.creeps.notPersistValue);
+    assert.isTrue(consoleLog.calledOnceWith("Cleaned up 1 stale creep memory entries"));
   });
 });

@@ -1,5 +1,6 @@
-import { runMemoryMigrations } from "memory/migrations";
 import { KERNEL_STAGE_ORDER, LifecycleStage, LifecycleStageName } from "runtime/lifecycle";
+import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
+import { runMemoryMigrations } from "memory/migrations";
 
 export interface KernelStageFailure {
   stage: LifecycleStageName;
@@ -118,7 +119,7 @@ function runSpawning(): void {
 }
 
 function cleanup(): void {
-  return;
+  cleanupDeadCreepMemory();
 }
 
 function flushStats(): void {
