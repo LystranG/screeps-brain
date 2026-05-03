@@ -44,13 +44,39 @@ function migrateToVersion1(memory: Memory): void {
   const defaults = createDefaultProjectMemorySections();
 
   memory.version = CURRENT_MEMORY_VERSION;
-  memory.runtime = memory.runtime || defaults.runtime;
-  memory.runtime.lastMigration = CURRENT_MEMORY_VERSION;
-  memory.runtime.migrationError = null;
-  memory.config = memory.config || defaults.config;
+  memory.runtime = {
+    ...defaults.runtime,
+    ...memory.runtime,
+    lastMigration: CURRENT_MEMORY_VERSION,
+    migrationError: null
+  };
+  memory.config = {
+    automation: {
+      ...defaults.config.automation,
+      ...memory.config?.automation
+    },
+    strategy: {
+      ...defaults.config.strategy,
+      ...memory.config?.strategy
+    },
+    construction: {
+      ...defaults.config.construction,
+      ...memory.config?.construction
+    },
+    defense: {
+      ...defaults.config.defense,
+      ...memory.config?.defense
+    }
+  };
   memory.colonies = memory.colonies || defaults.colonies;
   memory.processes = memory.processes || defaults.processes;
-  memory.commands = memory.commands || defaults.commands;
-  memory.stats = memory.stats || defaults.stats;
+  memory.commands = {
+    queue: memory.commands?.queue || defaults.commands.queue,
+    history: memory.commands?.history || defaults.commands.history
+  };
+  memory.stats = {
+    ticks: typeof memory.stats?.ticks === "number" ? memory.stats.ticks : defaults.stats.ticks,
+    cpu: memory.stats?.cpu || defaults.stats.cpu
+  };
   memory.creeps = memory.creeps || {};
 }

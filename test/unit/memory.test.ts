@@ -44,6 +44,43 @@ describe("memory migrations", () => {
     });
   });
 
+  it("repairs partial legacy sections while preserving existing values", () => {
+    const memory = {
+      version: 0,
+      runtime: {
+        bootstrapped: true
+      },
+      config: {
+        automation: {
+          enabled: true
+        },
+        strategy: {},
+        construction: {},
+        defense: {}
+      },
+      commands: {},
+      stats: {},
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.isTrue(result.ok);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
+    assert.isTrue(memory.runtime.bootstrapped);
+    assert.equal(memory.runtime.lastMigration, CURRENT_MEMORY_VERSION);
+    assert.isNull(memory.runtime.migrationError);
+    assert.isTrue(memory.config.automation.enabled);
+    assert.equal(memory.config.automation.mode, "manual");
+    assert.equal(memory.config.strategy.mode, "manual");
+    assert.isFalse(memory.config.construction.allowExtensions);
+    assert.equal(memory.config.defense.safeMode, "manual");
+    assert.deepEqual(memory.commands.queue, []);
+    assert.deepEqual(memory.commands.history, []);
+    assert.equal(memory.stats.ticks, 0);
+    assert.deepEqual(memory.stats.cpu, {});
+  });
+
   it("is idempotent when run repeatedly", () => {
     const memory = {} as Memory;
 

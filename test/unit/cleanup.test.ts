@@ -1,16 +1,16 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
 import { cleanupDeadCreepMemory } from "../../src/cleanup/creepMemory";
-import { Game, Memory } from "./mock";
+import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
 describe("cleanup|kernel cleanup", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   beforeEach(() => {
     // @ts-ignore : allow adding Game to global
-    global.Game = _.clone(Game);
+    global.Game = createMockGame();
     // @ts-ignore : allow adding Memory to global
-    global.Memory = _.clone(Memory);
+    global.Memory = createMockMemory();
   });
 
   afterEach(() => {
@@ -22,7 +22,8 @@ describe("cleanup|kernel cleanup", () => {
 
   it("deletes missing creep memory", () => {
     consoleLog = sinon.stub(console, "log");
-    Memory.creeps.missingCreep = {
+    const memory = mockMemory();
+    memory.creeps.missingCreep = {
       role: "worker",
       room: "W1N1",
       working: false
@@ -31,32 +32,35 @@ describe("cleanup|kernel cleanup", () => {
     const deletedCount = cleanupDeadCreepMemory();
 
     assert.equal(deletedCount, 1);
-    assert.isUndefined(Memory.creeps.missingCreep);
+    assert.isUndefined(memory.creeps.missingCreep);
     assert.isTrue(consoleLog.calledOnceWith("Cleaned up 1 stale creep memory entries"));
   });
 
   it("preserves existing creep memory", () => {
-    Memory.creeps.existingCreep = {
+    const memory = mockMemory();
+    const game = mockGame();
+    memory.creeps.existingCreep = {
       role: "worker",
       room: "W1N1",
       working: false
     };
-    Game.creeps.existingCreep = "mock creep";
+    game.creeps.existingCreep = "mock creep";
 
     const deletedCount = cleanupDeadCreepMemory();
 
     assert.equal(deletedCount, 0);
-    assert.isDefined(Memory.creeps.existingCreep);
+    assert.isDefined(memory.creeps.existingCreep);
   });
 
   it("logs one summary when stale creep memory is deleted", () => {
     consoleLog = sinon.stub(console, "log");
-    Memory.creeps.firstMissingCreep = {
+    const memory = mockMemory();
+    memory.creeps.firstMissingCreep = {
       role: "worker",
       room: "W1N1",
       working: false
     };
-    Memory.creeps.secondMissingCreep = {
+    memory.creeps.secondMissingCreep = {
       role: "worker",
       room: "W1N1",
       working: false

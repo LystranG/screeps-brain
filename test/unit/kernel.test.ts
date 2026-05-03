@@ -2,16 +2,16 @@ import { assert } from "chai";
 import * as sinon from "sinon";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
-import { Game, Memory } from "./mock";
+import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
 describe("cleanup|kernel runtime kernel", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   beforeEach(() => {
     // @ts-ignore : allow adding Game to global
-    global.Game = _.clone(Game);
+    global.Game = createMockGame();
     // @ts-ignore : allow adding Memory to global
-    global.Memory = _.clone(Memory);
+    global.Memory = createMockMemory();
   });
 
   afterEach(() => {
@@ -39,8 +39,7 @@ describe("cleanup|kernel runtime kernel", () => {
   });
 
   it("blocks later stages when migration fails", () => {
-    // @ts-ignore : allow mutating mocked global Memory
-    global.Memory.version = 999;
+    mockMemory().version = 999;
     const result = new Kernel().run();
 
     assert.isFalse(result.ok);
@@ -90,15 +89,17 @@ describe("cleanup|kernel runtime kernel", () => {
     consoleLog = sinon.stub(console, "log");
     const observedStages: LifecycleStageName[] = [];
     const stages: LifecycleStageOverrides = {};
-    Memory.creeps.persistValue = "any value";
-    Memory.creeps.notPersistValue = "any value";
-    Game.creeps.persistValue = "any value";
+    const memory = mockMemory();
+    const game = mockGame();
+    memory.creeps.persistValue = "any value";
+    memory.creeps.notPersistValue = "any value";
+    game.creeps.persistValue = "any value";
 
     for (const stageName of KERNEL_STAGE_ORDER) {
       if (stageName === "runSpawning") {
         stages[stageName] = () => {
           observedStages.push(stageName);
-          assert.isDefined(Memory.creeps.notPersistValue);
+          assert.isDefined(memory.creeps.notPersistValue);
         };
       } else if (stageName !== "cleanup") {
         stages[stageName] = () => observedStages.push(stageName);
@@ -117,8 +118,8 @@ describe("cleanup|kernel runtime kernel", () => {
       "runSpawning",
       "flushStats"
     ]);
-    assert.isDefined(Memory.creeps.persistValue);
-    assert.isUndefined(Memory.creeps.notPersistValue);
+    assert.isDefined(memory.creeps.persistValue);
+    assert.isUndefined(memory.creeps.notPersistValue);
     assert.isTrue(consoleLog.calledOnceWith("Cleaned up 1 stale creep memory entries"));
   });
 });
