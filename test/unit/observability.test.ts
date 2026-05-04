@@ -1,6 +1,9 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
 import { Logger } from "logging/Logger";
+import { createDefaultProjectMemorySections } from "memory/schema";
+import { Profiler } from "profiling/Profiler";
+import { flushRuntimeStats } from "stats/Stats";
 
 describe("logger|observability logger", () => {
   let consoleLog: sinon.SinonStub | null = null;
@@ -60,3 +63,80 @@ describe("logger|observability logger", () => {
     assert.equal(consoleLog.withArgs("[info] stats: rolling summary").callCount, 1);
   });
 });
+
+describe("profiler|stats|kernel observability services", () => {
+  it("records profiler stage deltas from CPU values", () => {
+    const cpuValues = [1, 3, 6];
+    const profiler = new Profiler({
+      getUsed: () => {
+        const nextValue = cpuValues.shift();
+
+        return nextValue === undefined ? 6 : nextValue;
+      }
+    });
+
+    profiler.startStage("migrate");
+    assert.deepEqual(profiler.endStage("migrate"), { stage: "migrate", duration: 2 });
+    assert.deepEqual(profiler.endStage("cleanup"), { stage: "cleanup", duration: 0 });
+    assert.deepEqual(profiler.getSamples(), [
+      { stage: "migrate", duration: 2 },
+      { stage: "cleanup", duration: 0 }
+    ]);
+  });
+
+  it("updates rolling stats summaries", () => {
+    const memory = createMemoryWithDefaults();
+
+    flushRuntimeStats(
+      memory,
+      [
+        { stage: "migrate", duration: 2 },
+        { stage: "cleanup", duration: 5 }
+      ],
+      true,
+      10
+    );
+    flushRuntimeStats(memory, [{ stage: "migrate", duration: 4 }], true, 11);
+
+    assert.equal(memory.stats.ticks, 11);
+    assert.isTrue(memory.stats.cpu.available);
+    assert.deepEqual(memory.stats.cpu.stages.migrate, {
+      last: 4,
+      average: 3,
+      max: 4,
+      samples: 2
+    });
+    assert.deepEqual(memory.stats.cpu.stages.cleanup, {
+      last: 5,
+      average: 5,
+      max: 5,
+      samples: 1
+    });
+  });
+
+  it("keeps sim CPU stats structurally present when available === false", () => {
+    const memory = createMemoryWithDefaults();
+
+    flushRuntimeStats(memory, [{ stage: "migrate", duration: 0 }], false, 12);
+
+    assert.equal(memory.stats.ticks, 12);
+    assert.isFalse(memory.stats.cpu.available);
+    assert.deepEqual(memory.stats.cpu.stages.migrate, {
+      last: 0,
+      average: 0,
+      max: 0,
+      samples: 1
+    });
+  });
+});
+
+function createMemoryWithDefaults(): Memory {
+  return {
+    ...createDefaultProjectMemorySections(),
+    creeps: {},
+    flags: {},
+    powerCreeps: {},
+    rooms: {},
+    spawns: {}
+  };
+}
