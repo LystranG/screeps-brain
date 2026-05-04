@@ -1,9 +1,61 @@
-export const CURRENT_MEMORY_VERSION = 1;
+export const CURRENT_MEMORY_VERSION = 2;
+
+export interface LogNamespaceConfigMemory {
+  enabled?: boolean;
+  sampleRate?: number;
+}
+
+export interface ObservabilityConfigMemory {
+  logLevel: "debug" | "info" | "warn" | "error";
+  enabledNamespaces: { [namespace: string]: LogNamespaceConfigMemory };
+  namespaceSampling: { [namespace: string]: number };
+  profiler: {
+    enabled: boolean;
+  };
+  deepProfiler: {
+    enabled: boolean;
+  };
+}
+
+export interface RuntimeEnvironmentSummaryMemory {
+  type: "sim" | "world" | "private" | "unknown";
+  shard: string;
+  lastChangedTick: number;
+  lastSeenTick: number;
+}
+
+export interface SimGuidanceMemory {
+  [code: string]: {
+    message?: string;
+    lastSeenTick?: number;
+    lastLoggedTick?: number;
+    flagName?: string;
+  };
+}
+
+export interface SimBootstrapMemory {
+  bootstrap: {
+    version: number;
+    completed: boolean;
+    ready: boolean;
+    lastRunTick: number;
+  };
+  guidance: SimGuidanceMemory;
+}
+
+export interface CpuStageSummaryMemory {
+  last: number;
+  average: number;
+  max: number;
+  samples: number;
+}
 
 export interface RuntimeMemory {
   bootstrapped: boolean;
   lastMigration: number;
   migrationError: string | null;
+  environment: RuntimeEnvironmentSummaryMemory;
+  sim: SimBootstrapMemory;
 }
 
 export interface ProjectConfigMemory {
@@ -29,6 +81,7 @@ export interface ProjectConfigMemory {
     safeMode: "manual";
     allowRamparts: boolean;
   };
+  observability: ObservabilityConfigMemory;
 }
 
 export interface ColoniesMemory {
@@ -46,7 +99,10 @@ export interface CommandsMemory {
 
 export interface StatsMemory {
   ticks: number;
-  cpu: Record<string, unknown>;
+  cpu: {
+    available: boolean;
+    stages: { [stageName: string]: CpuStageSummaryMemory };
+  };
 }
 
 export interface ProjectMemoryShape {
@@ -69,7 +125,22 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
     runtime: {
       bootstrapped: false,
       lastMigration: CURRENT_MEMORY_VERSION,
-      migrationError: null
+      migrationError: null,
+      environment: {
+        type: "unknown",
+        shard: "unknown",
+        lastChangedTick: 0,
+        lastSeenTick: 0
+      },
+      sim: {
+        bootstrap: {
+          version: 0,
+          completed: false,
+          ready: false,
+          lastRunTick: 0
+        },
+        guidance: {}
+      }
     },
     config: {
       automation: {
@@ -93,6 +164,17 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
         mode: "manual",
         safeMode: "manual",
         allowRamparts: false
+      },
+      observability: {
+        logLevel: "info",
+        enabledNamespaces: {},
+        namespaceSampling: {},
+        profiler: {
+          enabled: true
+        },
+        deepProfiler: {
+          enabled: false
+        }
       }
     },
     colonies: {},
@@ -103,7 +185,10 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
     },
     stats: {
       ticks: 0,
-      cpu: {}
+      cpu: {
+        available: true,
+        stages: {}
+      }
     }
   };
 }

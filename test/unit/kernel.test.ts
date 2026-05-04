@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
+import { CURRENT_MEMORY_VERSION } from "memory/schema";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
@@ -47,11 +48,14 @@ describe("cleanup|kernel runtime kernel", () => {
     assert.deepEqual(result.failures, [
       {
         stage: "migrate",
-        message: "Unsupported Memory.version 999; current version is 1"
+        message: `Unsupported Memory.version 999; current version is ${CURRENT_MEMORY_VERSION}`
       }
     ]);
     const failedMemory = (global as unknown as { Memory: Memory }).Memory;
-    assert.strictEqual(failedMemory.runtime.migrationError, "Unsupported Memory.version 999; current version is 1");
+    assert.strictEqual(
+      failedMemory.runtime.migrationError,
+      `Unsupported Memory.version 999; current version is ${CURRENT_MEMORY_VERSION}`
+    );
   });
 
   it("continues after non-migration stage failure", () => {

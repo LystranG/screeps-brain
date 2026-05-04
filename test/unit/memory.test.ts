@@ -3,13 +3,13 @@ import { CURRENT_MEMORY_VERSION } from "memory/schema";
 import { runMemoryMigrations } from "../../src/memory/migrations";
 
 describe("memory migrations", () => {
-  it("upgrades empty Memory to the v1 skeleton", () => {
+  it("upgrades empty Memory to the current skeleton", () => {
     const memory = {} as Memory;
 
     const result = runMemoryMigrations(memory);
 
     assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
-    assert.equal(memory.version, 1);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
     assert.deepEqual(memory.creeps, {});
     assert.isFalse(memory.runtime.bootstrapped);
     assert.isNull(memory.runtime.migrationError);
@@ -36,11 +36,88 @@ describe("memory migrations", () => {
     const result = runMemoryMigrations(memory);
 
     assert.isTrue(result.ok);
-    assert.equal(memory.version, 1);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
     assert.deepEqual(memory.creeps.worker1, {
       role: "worker",
       room: "W1N1",
       working: false
+    });
+  });
+
+  it("upgrades v1 memory to v2 observability, environment, and sim defaults", () => {
+    const memory = {
+      version: 1,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: 1,
+        migrationError: null
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        strategy: {
+          mode: "manual",
+          allowExpansion: false,
+          allowRemoteMining: false
+        },
+        construction: {
+          enabled: false,
+          mode: "manual",
+          allowRoads: false,
+          allowExtensions: false,
+          allowTowers: false
+        },
+        defense: {
+          enabled: false,
+          mode: "manual",
+          safeMode: "manual",
+          allowRamparts: false
+        }
+      },
+      colonies: {},
+      processes: {},
+      commands: {
+        queue: [],
+        history: []
+      },
+      stats: {
+        ticks: 7,
+        cpu: {}
+      },
+      creeps: {
+        worker1: {
+          role: "worker",
+          room: "W1N1",
+          working: false
+        }
+      }
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: 2 });
+    assert.equal((memory as Memory).version, 2, "Memory.version should equal 2 after migration");
+    assert.isTrue(memory.config.automation.enabled);
+    assert.deepEqual(memory.creeps.worker1, {
+      role: "worker",
+      room: "W1N1",
+      working: false
+    });
+    assert.equal(memory.config.observability.logLevel, "info");
+    assert.deepEqual(memory.config.observability.enabledNamespaces, {});
+    assert.deepEqual(memory.config.observability.namespaceSampling, {});
+    assert.isTrue(memory.config.observability.profiler.enabled);
+    assert.isFalse(memory.config.observability.deepProfiler.enabled);
+    assert.equal(memory.runtime.environment.type, "unknown");
+    assert.equal(memory.runtime.environment.shard, "unknown");
+    assert.isFalse(memory.runtime.sim.bootstrap.completed);
+    assert.isFalse(memory.runtime.sim.bootstrap.ready);
+    assert.deepEqual(memory.runtime.sim.guidance, {});
+    assert.deepEqual(memory.stats.cpu, {
+      available: true,
+      stages: {}
     });
   });
 
@@ -78,10 +155,16 @@ describe("memory migrations", () => {
     assert.deepEqual(memory.commands.queue, []);
     assert.deepEqual(memory.commands.history, []);
     assert.equal(memory.stats.ticks, 0);
-    assert.deepEqual(memory.stats.cpu, {});
+    assert.equal(memory.config.observability.logLevel, "info");
+    assert.equal(memory.runtime.environment.type, "unknown");
+    assert.isFalse(memory.runtime.sim.bootstrap.completed);
+    assert.deepEqual(memory.stats.cpu, {
+      available: true,
+      stages: {}
+    });
   });
 
-  it("is idempotent when run repeatedly", () => {
+  it("is idempotent when run repeatedly to version 2", () => {
     const memory = {} as Memory;
 
     runMemoryMigrations(memory);
@@ -89,12 +172,12 @@ describe("memory migrations", () => {
     runMemoryMigrations(memory);
 
     assert.equal(JSON.stringify(memory), firstMigration);
-    assert.equal(memory.version, 1);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
   });
 
   it("returns a failure result for future memory versions", () => {
     const memory = {
-      version: 2,
+      version: CURRENT_MEMORY_VERSION + 1,
       creeps: {}
     } as unknown as Memory;
 
