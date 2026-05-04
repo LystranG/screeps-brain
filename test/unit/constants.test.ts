@@ -3,16 +3,21 @@ import { CommandPath } from "constants/commands";
 import { MemoryKey } from "constants/memory";
 import { ProcessName } from "constants/processes";
 import { RoleName } from "constants/roles";
-import { RuntimeEnvironment, ShardName } from "constants/runtime";
+import { CpuAvailability, LogLevel, LoggerNamespace, RuntimeEnvironment, ShardName } from "constants/runtime";
 import { StrategyMode } from "constants/strategy";
 import { validateRoomName } from "validation/roomName";
-import { validateRuntimeEnvironment, validateShardName } from "validation/runtime";
+import { validateLogLevel, validateRuntimeEnvironment, validateShardName } from "validation/runtime";
+import { createMockGame } from "./mock";
 
 describe("constants|validation", () => {
   it("exposes stable runtime constants", () => {
     assert.equal(ShardName.sim, "sim");
     assert.equal(RuntimeEnvironment.sim, "sim");
     assert.equal(RuntimeEnvironment.world, "world");
+    assert.equal(LogLevel.info, "info");
+    assert.equal(LoggerNamespace.kernelEnvironment, "kernel:environment");
+    assert.equal(LoggerNamespace.simBootstrap, "sim:bootstrap");
+    assert.equal(CpuAvailability.available, "available");
     assert.equal(RoleName.worker, "worker");
     assert.equal(ProcessName.kernel, "kernel");
     assert.equal(ProcessName.lifecycle, "lifecycle");
@@ -39,6 +44,25 @@ describe("constants|validation", () => {
   it("accepts known shard and environment values", () => {
     assert.deepEqual(validateShardName(" sim "), { ok: true, value: ShardName.sim });
     assert.deepEqual(validateRuntimeEnvironment("sim"), { ok: true, value: RuntimeEnvironment.sim });
+  });
+
+  it("validates log levels", () => {
+    assert.deepEqual(validateLogLevel("info"), { ok: true, value: LogLevel.info });
+    assert.deepEqual(validateLogLevel("verbose"), {
+      ok: false,
+      reason: "Log level must be one of: debug, info, warn, error"
+    });
+  });
+
+  it("creates mutable Screeps runtime mocks for environment tests", () => {
+    const game = createMockGame();
+
+    game.shard.name = "sim";
+    assert.equal(game.shard.name, "sim");
+    assert.equal(game.cpu.getUsed(), 0);
+    assert.deepEqual(game.rooms, {});
+    assert.deepEqual(game.spawns, {});
+    assert.deepEqual(game.flags, {});
   });
 
   it("rejects unknown shard and environment values with reasons", () => {

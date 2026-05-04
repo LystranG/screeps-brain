@@ -1,8 +1,22 @@
-import { RuntimeEnvironment, ShardName } from "constants/runtime";
+import { LogLevel, RuntimeEnvironment, ShardName } from "constants/runtime";
 import { ValidationResult } from "validation/results";
 
+const logLevels = Object.values(LogLevel) as string[];
 const shardNames = Object.values(ShardName) as string[];
 const runtimeEnvironments = Object.values(RuntimeEnvironment) as string[];
+
+/**
+ * 校验日志等级，后续命令和 Memory 配置写入前都应走同一入口。
+ */
+export function validateLogLevel(value: string): ValidationResult<LogLevel> {
+  const logLevel = value.trim();
+
+  if (logLevels.includes(logLevel)) {
+    return { ok: true, value: logLevel as LogLevel };
+  }
+
+  return { ok: false, reason: `Log level must be one of: ${logLevels.join(", ")}` };
+}
 
 /**
  * 校验 shard 名称来自集中常量，避免后续环境判断散落硬编码字符串。

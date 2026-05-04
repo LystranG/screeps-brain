@@ -1,14 +1,32 @@
 // 每个测试都创建新对象，避免 shallow clone 共享嵌套 Memory/Game 状态。
 export function createMockGame(): {
   creeps: { [name: string]: any };
-  rooms: any;
-  spawns: any;
-  time: any;
+  cpu: {
+    getUsed: () => number;
+    tickLimit: number;
+    bucket: number;
+  };
+  shard: {
+    name: string;
+  };
+  rooms: { [roomName: string]: any };
+  spawns: { [spawnName: string]: any };
+  flags: { [flagName: string]: any };
+  time: number;
 } {
   return {
     creeps: {},
-    rooms: [],
+    cpu: {
+      getUsed: () => 0,
+      tickLimit: 500,
+      bucket: 10000
+    },
+    shard: {
+      name: "sim"
+    },
+    rooms: {},
     spawns: {},
+    flags: {},
     time: 12345
   };
 }
