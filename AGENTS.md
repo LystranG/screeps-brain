@@ -158,6 +158,9 @@ The initial work focuses on foundations first: low-coupling, high-cohesion modul
 - 公共导出函数或后续会被其他模块调用的工具函数，如果语义不直观，优先用中文 JSDoc/TSDoc 描述用途、参数约束、返回结果和 Screeps 运行时注意事项。
 - Ambient Screeps type declarations in `src/main.ts` use block comments instead of formal TSDoc because they document global merge behavior rather than exported APIs.
 ## Function Design
+## Commit Signing
+- 本仓库提交启用了自动签名；如果 `git commit` 因 ssh/gpg agent 授权失败（例如提示找不到 key 或需要用户手动授权），停止后续提交尝试并等待用户完成授权。
+- 不要为了继续任务而绕过签名、关闭 `commit.gpgsign`、使用 `--no-gpg-sign`，或修改仓库/全局签名配置；用户授权完成后再重试原始提交命令。
 ## Module Design
 <!-- GSD:conventions-end -->
 

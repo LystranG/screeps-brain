@@ -6,5 +6,6 @@ import { Kernel } from "runtime/Kernel";
 const kernel = new Kernel();
 
 export const loop = ErrorMapper.wrapLoop(() => {
+  // 入口只负责触发内核，具体 tick 行为由生命周期阶段承载。
   kernel.run();
 });

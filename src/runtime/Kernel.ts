@@ -26,6 +26,9 @@ export class Kernel {
     this.stages = options.stages || {};
   }
 
+  /**
+   * 按固定生命周期执行一个 tick；迁移失败会阻断后续阶段，其他阶段失败会记录后继续。
+   */
   public run(): KernelRunResult {
     const result: KernelRunResult = {
       ok: true,
@@ -45,6 +48,7 @@ export class Kernel {
           message: error instanceof Error ? error.message : "Unknown kernel stage failure"
         });
 
+        // Memory schema 不可信时不能继续执行后续系统，避免把坏状态扩散到本 tick。
         if (stage.name === "migrate") {
           return result;
         }
@@ -56,6 +60,7 @@ export class Kernel {
     return result;
   }
 
+  // 测试可以覆盖任意阶段，生产路径则回落到默认阶段 runner。
   private createLifecycleStages(): LifecycleStage[] {
     return KERNEL_STAGE_ORDER.map(stageName => ({
       name: stageName,
@@ -64,6 +69,7 @@ export class Kernel {
   }
 }
 
+// 通过穷尽 switch 绑定阶段名，新增阶段时 TypeScript 会暴露遗漏的默认 runner。
 function getDefaultStageRunner(stageName: LifecycleStageName): () => void {
   switch (stageName) {
     case "migrate":
@@ -93,6 +99,7 @@ function migrate(): void {
 }
 
 function recordMigrationError(reason: string): void {
+  // 迁移失败也要留下 runtime section，方便后续 tick 和控制台诊断失败原因。
   Memory.runtime = Memory.runtime || {
     bootstrapped: false,
     lastMigration: typeof Memory.version === "number" ? Memory.version : 0,
@@ -119,6 +126,7 @@ function runSpawning(): void {
 }
 
 function cleanup(): void {
+  // cleanup 阶段只做 tick 末尾的安全收尾，不放置新的策略行为。
   cleanupDeadCreepMemory();
 }
 

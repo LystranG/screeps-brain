@@ -1,3 +1,4 @@
+// 生命周期顺序是内核的稳定契约，后续阶段只能在这里显式调整。
 export const KERNEL_STAGE_ORDER = [
   "migrate",
   "refreshServices",

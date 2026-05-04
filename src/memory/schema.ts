@@ -60,6 +60,9 @@ export interface ProjectMemoryShape {
   creeps: {[creepName: string]: CreepMemory};
 }
 
+/**
+ * 创建除 `creeps` 外的项目 Memory 默认结构；`creeps` 由 Screeps 和迁移流程单独保留。
+ */
 export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "creeps"> {
   return {
     version: CURRENT_MEMORY_VERSION,
@@ -106,6 +109,7 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
 }
 
 declare global {
+  // 扩展 Screeps 全局 Memory 类型，确保持久化结构在编译期可见。
   interface Memory {
     version: number;
     runtime: RuntimeMemory;

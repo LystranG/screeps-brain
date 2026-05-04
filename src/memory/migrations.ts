@@ -8,6 +8,9 @@ const orderedMigrations: {[version: number]: MigrationStep} = {
   1: migrateToVersion1
 };
 
+/**
+ * 从当前 Memory.version 逐步迁移到最新版本；不支持未来版本，避免降级写坏存档。
+ */
 export function runMemoryMigrations(memory: Memory): MigrationResult {
   try {
     const startingVersion = typeof memory.version === "number" ? memory.version : 0;
@@ -19,6 +22,7 @@ export function runMemoryMigrations(memory: Memory): MigrationResult {
       };
     }
 
+    // 逐版本执行，后续新增 v2/v3 时可以在同一机制下保持可回放。
     for (let version = startingVersion + 1; version <= CURRENT_MEMORY_VERSION; version += 1) {
       orderedMigrations[version](memory);
     }
@@ -43,6 +47,7 @@ export function runMemoryMigrations(memory: Memory): MigrationResult {
 function migrateToVersion1(memory: Memory): void {
   const defaults = createDefaultProjectMemorySections();
 
+  // partial legacy Memory 需要按嵌套 section 合并默认值，不能只判断顶层对象是否存在。
   memory.version = CURRENT_MEMORY_VERSION;
   memory.runtime = {
     ...defaults.runtime,
