@@ -1,6 +1,10 @@
 import { KERNEL_STAGE_ORDER, LifecycleStage, LifecycleStageName } from "runtime/lifecycle";
 import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
+import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
+import { runSimBootstrap } from "environment/simBootstrap";
 import { runMemoryMigrations } from "memory/migrations";
+import { RuntimeServices, createRuntimeServices } from "runtime/services";
+import { flushRuntimeStats } from "stats/Stats";
 
 export interface KernelStageFailure {
   stage: LifecycleStageName;
@@ -21,6 +25,7 @@ export interface KernelOptions {
 
 export class Kernel {
   private readonly stages: LifecycleStageOverrides;
+  private services: RuntimeServices | null = null;
 
   public constructor(options: KernelOptions = {}) {
     this.stages = options.stages || {};
@@ -40,8 +45,26 @@ export class Kernel {
       result.executedStages.push(stage.name);
 
       try {
+        if (stage.name === "refreshServices" && Memory.config?.observability) {
+          this.services = createRuntimeServices(Memory, Game);
+        }
+
+        const shouldProfile = this.shouldProfileStage(stage.name);
+
+        if (shouldProfile) {
+          this.services?.profiler.startStage(stage.name);
+        }
+
         stage.run();
+
+        if (shouldProfile) {
+          this.services?.profiler.endStage(stage.name);
+        }
       } catch (error) {
+        if (this.shouldProfileStage(stage.name)) {
+          this.services?.profiler.endStage(stage.name);
+        }
+
         result.ok = false;
         result.failures.push({
           stage: stage.name,
@@ -64,72 +87,93 @@ export class Kernel {
   private createLifecycleStages(): LifecycleStage[] {
     return KERNEL_STAGE_ORDER.map(stageName => ({
       name: stageName,
-      run: this.stages[stageName] || getDefaultStageRunner(stageName)
+      run: this.stages[stageName] || this.getDefaultStageRunner(stageName)
     }));
   }
-}
 
-// 通过穷尽 switch 绑定阶段名，新增阶段时 TypeScript 会暴露遗漏的默认 runner。
-function getDefaultStageRunner(stageName: LifecycleStageName): () => void {
-  switch (stageName) {
-    case "migrate":
-      return migrate;
-    case "refreshServices":
-      return refreshServices;
-    case "detectEnvironmentBootstrap":
-      return detectEnvironmentBootstrap;
-    case "runColoniesAndProcesses":
-      return runColoniesAndProcesses;
-    case "runSpawning":
-      return runSpawning;
-    case "cleanup":
-      return cleanup;
-    case "flushStats":
-      return flushStats;
+  private shouldProfileStage(stageName: LifecycleStageName): boolean {
+    return this.services !== null && stageName !== "migrate" && stageName !== "flushStats";
   }
-}
 
-function migrate(): void {
-  const migrationResult = runMemoryMigrations(Memory);
-
-  if (!migrationResult.ok) {
-    recordMigrationError(migrationResult.reason);
-    throw new Error(migrationResult.reason);
+  // 通过穷尽 switch 绑定阶段名，新增阶段时 TypeScript 会暴露遗漏的默认 runner。
+  private getDefaultStageRunner(stageName: LifecycleStageName): () => void {
+    switch (stageName) {
+      case "migrate":
+        return () => this.migrate();
+      case "refreshServices":
+        return () => this.refreshServices();
+      case "detectEnvironmentBootstrap":
+        return () => this.detectEnvironmentBootstrap();
+      case "runColoniesAndProcesses":
+        return () => this.runColoniesAndProcesses();
+      case "runSpawning":
+        return () => this.runSpawning();
+      case "cleanup":
+        return () => this.cleanup();
+      case "flushStats":
+        return () => this.flushStats();
+    }
   }
-}
 
-function recordMigrationError(reason: string): void {
-  // 迁移失败也要留下 runtime section，方便后续 tick 和控制台诊断失败原因。
-  Memory.runtime = Memory.runtime || {
-    bootstrapped: false,
-    lastMigration: typeof Memory.version === "number" ? Memory.version : 0,
-    migrationError: null
-  };
-  Memory.runtime.bootstrapped = false;
-  Memory.runtime.migrationError = reason;
-}
+  private migrate(): void {
+    const migrationResult = runMemoryMigrations(Memory);
 
-function refreshServices(): void {
-  return;
-}
+    if (!migrationResult.ok) {
+      this.recordMigrationError(migrationResult.reason);
+      throw new Error(migrationResult.reason);
+    }
+  }
 
-function detectEnvironmentBootstrap(): void {
-  return;
-}
+  private recordMigrationError(reason: string): void {
+    // 迁移失败也要留下 runtime section，方便后续 tick 和控制台诊断失败原因。
+    Memory.runtime = Memory.runtime || {
+      bootstrapped: false,
+      lastMigration: typeof Memory.version === "number" ? Memory.version : 0,
+      migrationError: null
+    };
+    Memory.runtime.bootstrapped = false;
+    Memory.runtime.migrationError = reason;
+  }
 
-function runColoniesAndProcesses(): void {
-  return;
-}
+  private refreshServices(): void {
+    return;
+  }
 
-function runSpawning(): void {
-  return;
-}
+  private detectEnvironmentBootstrap(): void {
+    const services = this.requireServices();
+    const environment = detectRuntimeEnvironment(Game);
 
-function cleanup(): void {
-  // cleanup 阶段只做 tick 末尾的安全收尾，不放置新的策略行为。
-  cleanupDeadCreepMemory();
-}
+    services.environment = environment;
+    services.cpuAvailable = environment.cpuAvailable;
+    updateRuntimeEnvironmentSummary(Memory, environment, Game.time);
+    runSimBootstrap(Memory, Game, services.logger, Game.time);
+  }
 
-function flushStats(): void {
-  return;
+  private runColoniesAndProcesses(): void {
+    return;
+  }
+
+  private runSpawning(): void {
+    return;
+  }
+
+  private cleanup(): void {
+    // cleanup 阶段只做 tick 末尾的安全收尾，不放置新的策略行为。
+    cleanupDeadCreepMemory();
+  }
+
+  private flushStats(): void {
+    const services = this.requireServices();
+
+    flushRuntimeStats(Memory, services.profiler.getSamples(), services.cpuAvailable, Game.time);
+    services.profiler.reset();
+  }
+
+  private requireServices(): RuntimeServices {
+    if (this.services === null) {
+      throw new Error("Runtime services are not initialized");
+    }
+
+    return this.services;
+  }
 }
