@@ -1,4 +1,5 @@
 import { assert } from "chai";
+import { buildColonyContexts } from "colony/context";
 import { buildVolatileRoomIntel, persistColonyIntel, shouldPersistIntel } from "colony/intel";
 import { ColonyContext, ColonyReadiness, VolatileRoomIntel } from "colony/types";
 import { ColonyIntelMemory, createDefaultProjectMemorySections } from "memory/schema";
@@ -142,6 +143,67 @@ describe("room intel", () => {
   });
 });
 
+describe("colony context builder", () => {
+  it("selects configured primary when valid and sorts primary first", () => {
+    const memory = createMemoryWithDefaults();
+    const game = createMockGame();
+    game.shard.name = "shard0";
+    memory.config.colony.primaryRoomName = "W1N2";
+    game.rooms = {
+      W1N1: createReadyRoom("W1N1", "1"),
+      W1N2: createReadyRoom("W1N2", "2")
+    };
+
+    const result = buildColonyContexts(memory, game as unknown as Game, 55);
+
+    assert.equal(result.primaryRoomName, "W1N2");
+    assert.deepEqual(
+      result.contexts.map((context: ColonyContext) => context.roomName),
+      ["W1N2", "W1N1"]
+    );
+    assert.isTrue(result.contexts[0].primary);
+    assert.equal(result.contexts[0].readiness, "ready");
+  });
+
+  it("falls back deterministically and can avoid primary/intel persistence", () => {
+    const memory = createMemoryWithDefaults();
+    const game = createMockGame();
+    game.shard.name = "sim";
+    game.rooms = {
+      W9N9: createMockRoom({ name: "W9N9" }),
+      W1N1: createMockRoom({ name: "W1N1" })
+    };
+
+    const result = buildColonyContexts(memory, game as unknown as Game, 56, {
+      persistPrimary: false,
+      persistIntel: false
+    });
+
+    assert.equal(result.primaryRoomName, "W1N1");
+    assert.isNull(memory.config.colony.primaryRoomName);
+    assert.deepEqual(memory.colonies, {});
+    assert.deepEqual(result.contexts[0].missingReasons, ["missing controller", "missing spawn", "missing source"]);
+    assert.equal(result.contexts[0].readiness, "degraded");
+  });
+
+  it("persists fallback primary and conservative intel when enabled", () => {
+    const memory = createMemoryWithDefaults();
+    const game = createMockGame();
+    game.shard.name = "shard0";
+    game.rooms = {
+      W2N1: createReadyRoom("W2N1", "2"),
+      W1N1: createReadyRoom("W1N1", "1")
+    };
+
+    const result = buildColonyContexts(memory, game as unknown as Game, 57);
+
+    assert.equal(result.primaryRoomName, "W1N1");
+    assert.equal(memory.config.colony.primaryRoomName, "W1N1");
+    assert.equal(memory.colonies.W1N1.intel.lastRefreshTick, 57);
+    assert.equal(memory.colonies.W1N1.intel.stage, "rcl1");
+  });
+});
+
 function createMemoryWithDefaults(): Memory {
   return {
     ...createDefaultProjectMemorySections(),
@@ -168,4 +230,15 @@ function createIntelMemory(overrides: Partial<ColonyIntelMemory> = {}): ColonyIn
     stage: "rcl2",
     ...overrides
   };
+}
+
+function createReadyRoom(roomName: string, suffix: string): any {
+  return createMockRoom({
+    name: roomName,
+    controller: { id: `controller-${suffix}`, my: true, level: 1 },
+    spawns: [{ id: `spawn-${suffix}` }],
+    sources: [{ id: `source-${suffix}` }],
+    energyAvailable: 300,
+    energyCapacityAvailable: 300
+  });
 }
