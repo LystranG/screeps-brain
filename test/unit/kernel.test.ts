@@ -1,7 +1,7 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
 import { RuntimeEnvironment } from "constants/runtime";
-import { CURRENT_MEMORY_VERSION } from "memory/schema";
+import { CURRENT_MEMORY_VERSION, createDefaultProjectMemorySections } from "memory/schema";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
@@ -59,6 +59,28 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     );
   });
 
+  it("repairs partial current-version memory before creating services", () => {
+    const memory = mockMemory();
+    const game = mockGame();
+    const defaults = createDefaultProjectMemorySections();
+
+    memory.config = defaults.config;
+    memory.runtime = defaults.runtime;
+    memory.stats = defaults.stats;
+    memory.version = CURRENT_MEMORY_VERSION;
+    delete (memory.config as Partial<Memory["config"]>).observability;
+    delete (memory.runtime as Partial<Memory["runtime"]>).environment;
+    delete (memory.runtime as Partial<Memory["runtime"]>).sim;
+    game.shard.name = "shard0";
+
+    const result = new Kernel().run();
+
+    assert.isTrue(result.ok);
+    assert.equal(memory.config.observability.logLevel, "info");
+    assert.equal(memory.runtime.environment.type, RuntimeEnvironment.world);
+    assert.equal(memory.stats.ticks, game.time);
+  });
+
   it("continues after non-migration stage failure", () => {
     consoleLog = sinon.stub(console, "log");
     const observedStages: LifecycleStageName[] = [];
@@ -108,7 +130,6 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.runtime.environment.shard, "shard0");
     assert.isAtLeast(memory.stats.cpu.stages.cleanup.samples, 1);
     assert.containsAllKeys(memory.stats.cpu.stages, [
-      "refreshServices",
       "detectEnvironmentBootstrap",
       "runColoniesAndProcesses",
       "runSpawning",

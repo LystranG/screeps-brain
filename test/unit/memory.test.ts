@@ -164,6 +164,72 @@ describe("memory migrations", () => {
     });
   });
 
+  it("repairs partial current-version memory before runtime services use it", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: CURRENT_MEMORY_VERSION,
+        migrationError: null
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        }
+      },
+      stats: {
+        ticks: 12,
+        cpu: {}
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.config.observability.logLevel, "info");
+    assert.isTrue(memory.config.observability.profiler.enabled);
+    assert.equal(memory.runtime.environment.type, "unknown");
+    assert.isFalse(memory.runtime.sim.bootstrap.completed);
+    assert.deepEqual(memory.stats.cpu.stages, {});
+  });
+
+  it("preserves legacy CPU stage summaries when migrating to v2", () => {
+    const legacyHarvest = {
+      last: 2,
+      average: 3,
+      max: 5,
+      samples: 4
+    };
+    const memory = {
+      version: 1,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: 1,
+        migrationError: null
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        }
+      },
+      stats: {
+        ticks: 7,
+        cpu: {
+          harvest: legacyHarvest
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.deepEqual(memory.stats.cpu.stages.harvest, legacyHarvest);
+  });
+
   it("is idempotent when run repeatedly to version 2", () => {
     const memory = {} as Memory;
 

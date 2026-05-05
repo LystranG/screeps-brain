@@ -1,5 +1,6 @@
 import {
   CURRENT_MEMORY_VERSION,
+  CpuStageSummaryMemory,
   ProjectConfigMemory,
   RuntimeMemory,
   StatsMemory,
@@ -37,9 +38,8 @@ export function runMemoryMigrations(memory: Memory): MigrationResult {
       orderedMigrations[version](memory);
     }
 
-    if (memory.version !== CURRENT_MEMORY_VERSION) {
-      memory.version = CURRENT_MEMORY_VERSION;
-    }
+    // 当前版本的 Memory 也可能被手动编辑成 partial state；重跑当前迁移只补默认值。
+    orderedMigrations[CURRENT_MEMORY_VERSION](memory);
 
     return { ok: true, version: CURRENT_MEMORY_VERSION };
   } catch (error) {
@@ -107,6 +107,9 @@ function migrateToVersion1(memory: Memory): void {
 
 function migrateToVersion2(memory: Memory): void {
   const defaults = createDefaultProjectMemorySections();
+  const legacyCpu = memory.stats?.cpu as Record<string, unknown> | undefined;
+  const existingStages = legacyCpu?.stages as { [stageName: string]: CpuStageSummaryMemory } | undefined;
+  const legacyStageStats = extractLegacyCpuStages(legacyCpu);
 
   // v2 只补齐观测、环境、sim 和结构化 CPU stats；已有用户策略值继续保留。
   memory.version = CURRENT_MEMORY_VERSION;
@@ -164,8 +167,48 @@ function migrateToVersion2(memory: Memory): void {
     cpu: {
       ...defaults.stats.cpu,
       ...memory.stats?.cpu,
-      stages: memory.stats?.cpu?.stages || defaults.stats.cpu.stages
+      stages: {
+        ...defaults.stats.cpu.stages,
+        ...legacyStageStats,
+        ...existingStages
+      }
     }
   };
   memory.creeps = memory.creeps || {};
+}
+
+function extractLegacyCpuStages(legacyCpu: Record<string, unknown> | undefined): { [stageName: string]: CpuStageSummaryMemory } {
+  const stages: { [stageName: string]: CpuStageSummaryMemory } = {};
+
+  if (!legacyCpu) {
+    return stages;
+  }
+
+  for (const stageName of Object.keys(legacyCpu)) {
+    if (stageName === "available" || stageName === "stages") {
+      continue;
+    }
+
+    const value = legacyCpu[stageName];
+    if (isCpuStageSummaryMemory(value)) {
+      stages[stageName] = value;
+    }
+  }
+
+  return stages;
+}
+
+function isCpuStageSummaryMemory(value: unknown): value is CpuStageSummaryMemory {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<CpuStageSummaryMemory>;
+
+  return (
+    typeof candidate.last === "number" &&
+    typeof candidate.average === "number" &&
+    typeof candidate.max === "number" &&
+    typeof candidate.samples === "number"
+  );
 }

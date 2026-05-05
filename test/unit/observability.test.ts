@@ -63,6 +63,19 @@ describe("environment|sim bootstrap|observability logger|profiler|stats|observab
     assert.isTrue(consoleLog.calledWith("[warn] stats: warning bypasses namespace sampling"));
     assert.equal(consoleLog.withArgs("[info] stats: rolling summary").callCount, 1);
   });
+
+  it("treats invalid namespace sampling as unsampled", () => {
+    consoleLog = sinon.stub(console, "log");
+    const logger = new Logger({ namespaceSampling: { stats: Number.NaN, "sim:bootstrap": Number.POSITIVE_INFINITY } }, () => 11);
+
+    logger.info("stats", "nan sample rate");
+    logger.debug("sim:bootstrap", "debug remains level-filtered");
+    logger.info("sim:bootstrap", "infinite sample rate");
+
+    assert.isTrue(consoleLog.calledWith("[info] stats: nan sample rate"));
+    assert.isTrue(consoleLog.calledWith("[info] sim:bootstrap: infinite sample rate"));
+    assert.isFalse(consoleLog.calledWithMatch("debug remains level-filtered"));
+  });
 });
 
 describe("profiler|stats|kernel observability services", () => {

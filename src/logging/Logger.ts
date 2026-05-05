@@ -82,10 +82,10 @@ export class Logger {
   private samplingPermits(namespace: string): boolean {
     const sampleRate = this.config.namespaceSampling?.[namespace];
 
-    if (sampleRate === undefined || sampleRate <= 1) {
+    if (sampleRate === undefined || !Number.isFinite(sampleRate) || sampleRate <= 1) {
       return true;
     }
 
-    return this.tickProvider() % sampleRate === 0;
+    return this.tickProvider() % Math.floor(sampleRate) === 0;
   }
 }

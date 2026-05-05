@@ -45,10 +45,6 @@ export class Kernel {
       result.executedStages.push(stage.name);
 
       try {
-        if (stage.name === "refreshServices" && Memory.config?.observability) {
-          this.services = createRuntimeServices(Memory, Game);
-        }
-
         const shouldProfile = this.shouldProfileStage(stage.name);
 
         if (shouldProfile) {
@@ -136,7 +132,7 @@ export class Kernel {
   }
 
   private refreshServices(): void {
-    return;
+    this.services = createRuntimeServices(Memory, Game);
   }
 
   private detectEnvironmentBootstrap(): void {
