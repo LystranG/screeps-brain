@@ -99,12 +99,12 @@ Plans:
 
 **Requirements:** COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05
 
-**Plans:** 3/5 plans complete
+**Plans:** 4/5 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Add typed Memory and constants foundation for Phase 4 primitives.
 - [x] 04-02-PLAN.md — Create colony context and room intel primitives without behavior execution.
-- [ ] 04-03-PLAN.md — Pending
+- [x] 04-03-PLAN.md — Add process, role, and task primitives with cadence-aware runner and no-op role skeletons.
 - [x] 04-04-PLAN.md — Add spawn queue, body builder, and dry-run validation primitives.
 - [ ] 04-05-PLAN.md — Pending
 
@@ -192,7 +192,7 @@ Plans:
 | COL-02 | Phase 4 | Complete |
 | COL-03 | Phase 4 | Complete |
 | COL-04 | Phase 4 | Complete |
-| BEH-01 | Phase 4 | Pending |
+| BEH-01 | Phase 4 | Complete |
 | BEH-02 | Phase 4 | Complete |
 | BEH-03 | Phase 4 | Complete |
 | BEH-04 | Phase 4 | Complete |

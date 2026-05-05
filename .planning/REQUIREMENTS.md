@@ -59,7 +59,7 @@
 
 ### Behavior Framework
 
-- [ ] **BEH-01**: A process abstraction owns focused behavior domains and can run against a `ColonyContext`.
+- [x] **BEH-01**: A process abstraction owns focused behavior domains and can run against a `ColonyContext`.
 - [x] **BEH-02**: A role registry maps creep memory role names to role runners without large conditional dispatch blocks.
 - [x] **BEH-03**: A lightweight task abstraction represents a creep's current action and target ID.
 - [x] **BEH-04**: A spawn queue accepts spawn requests with role, priority, body, memory, and reason metadata.
@@ -154,7 +154,7 @@
 | COL-02 | Phase 4 | Complete |
 | COL-03 | Phase 4 | Complete |
 | COL-04 | Phase 4 | Complete |
-| BEH-01 | Phase 4 | Pending |
+| BEH-01 | Phase 4 | Complete |
 | BEH-02 | Phase 4 | Complete |
 | BEH-03 | Phase 4 | Complete |
 | BEH-04 | Phase 4 | Complete |
