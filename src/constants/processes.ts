@@ -4,7 +4,10 @@ export const ProcessName = {
   migration: "migration",
   environment: "environment",
   colony: "colony",
+  colonyIntel: "colonyIntel",
+  creepRoles: "creepRoles",
   spawn: "spawn",
+  spawnValidation: "spawnValidation",
   cleanup: "cleanup",
   stats: "stats"
 } as const;
