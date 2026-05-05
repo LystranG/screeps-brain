@@ -30,6 +30,8 @@ describe("main", () => {
   });
 
   it("should return void", () => {
+    mockGame().shard.name = "shard0";
+
     assert.isUndefined(loop());
   });
 
@@ -37,6 +39,7 @@ describe("main", () => {
     consoleLog = sinon.stub(console, "log");
     const memory = mockMemory();
     const game = mockGame();
+    game.shard.name = "shard0";
     memory.creeps.persistValue = "any value";
     memory.creeps.notPersistValue = "any value";
     game.creeps.persistValue = "any value";
@@ -50,6 +53,7 @@ describe("main", () => {
 
   it("does not emit the starter Current game tick log", () => {
     consoleLog = sinon.stub(console, "log");
+    mockGame().shard.name = "shard0";
 
     loop();
 
