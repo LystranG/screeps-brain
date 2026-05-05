@@ -30,6 +30,8 @@ function confirmResult(message: string): CommandResult {
   };
 }
 
+const blockedNamespaceKeys = ["__proto__", "prototype", "constructor"];
+
 function validateNamespace(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
@@ -37,7 +39,12 @@ function validateNamespace(value: unknown): string | null {
 
   const namespace = value.trim();
 
-  return namespace.length > 0 ? namespace : null;
+  // 普通 Memory map 会把这些键解释成原型相关属性，不能作为可序列化 namespace 写入。
+  if (namespace.length === 0 || blockedNamespaceKeys.includes(namespace)) {
+    return null;
+  }
+
+  return namespace;
 }
 
 function createLogLevelCommand(): CommandDefinition {
