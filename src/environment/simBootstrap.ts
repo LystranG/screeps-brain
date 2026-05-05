@@ -16,6 +16,7 @@ interface SimGuidanceEntryState {
   lastSeenTick?: number;
   lastLoggedTick?: number;
   flagName?: string;
+  flagResult?: string;
   active?: boolean;
 }
 
@@ -29,13 +30,28 @@ interface SourceAwareRoom {
   sources?: Source[];
 }
 
+interface FlagGuidanceRoom {
+  controller?: {
+    pos?: {
+      createFlag?: (name?: string) => ERR_NAME_EXISTS | ERR_INVALID_ARGS | string;
+    };
+  };
+}
+
 const FIND_SOURCES_CONSTANT = 105 as FIND_SOURCES;
+const ERR_NAME_EXISTS_CODE = -3 as ERR_NAME_EXISTS;
 
 const GuidanceMessage = {
   missingSource: "Sim setup needs at least one visible source; normal bot runtime cannot create sources.",
   missingSpawn: "Sim setup needs at least one owned spawn; normal bot runtime cannot create spawn structures.",
   missingCreep: "Sim setup has no creeps yet; create an initial worker or let a prepared sim seed provide one."
 } as const;
+
+const GuidanceFlagName: { [code: string]: string } = {
+  "missing-source": "lystran-sim-source-needed",
+  "missing-spawn": "lystran-sim-spawn-needed",
+  "missing-creep": "lystran-sim-creep-needed"
+};
 
 /**
  * 初始化 sim 专用 Memory 与缺失对象 guidance；不会创建 creep/source/spawn 等世界对象。
@@ -50,6 +66,7 @@ export function runSimBootstrap(memory: Memory, game: Game, logger: Logger, tick
   const sourceDetection = detectVisibleSources(game.rooms);
   const guidanceMessages = buildGuidanceMessages(sourceDetection, metadata.spawnCount, Object.keys(game.creeps).length);
   const loggedCodes = updateGuidance(memory, logger, guidanceMessages, tick);
+  updateFlagGuidance(memory, game, Object.keys(guidanceMessages));
   const ready = metadata.spawnCount > 0 && sourceDetection.available && sourceDetection.count > 0;
 
   memory.runtime.sim.bootstrap.version = SIM_BOOTSTRAP_VERSION;
@@ -149,4 +166,61 @@ function updateGuidance(
   });
 
   return loggedCodes;
+}
+
+function updateFlagGuidance(memory: Memory, game: Game, activeCodes: string[]): void {
+  const flagPosition = findFlagGuidancePosition(game.rooms);
+
+  activeCodes.forEach(code => {
+    const flagName = GuidanceFlagName[code];
+
+    if (!flagName) {
+      return;
+    }
+
+    const entry = memory.runtime.sim.guidance[code] as SimGuidanceEntryState;
+    entry.flagName = flagName;
+
+    if (entry.flagResult && entry.flagResult !== "unavailable") {
+      return;
+    }
+
+    if (game.flags[flagName]) {
+      entry.flagResult = "exists";
+      return;
+    }
+
+    if (!flagPosition) {
+      entry.flagResult = "unavailable";
+      return;
+    }
+
+    const result = flagPosition.createFlag(flagName);
+
+    if (typeof result === "string" || result === ERR_NAME_EXISTS_CODE) {
+      entry.flagResult = "created";
+      return;
+    }
+
+    entry.flagResult = `error:${result}`;
+  });
+}
+
+function findFlagGuidancePosition(
+  rooms: Game["rooms"]
+): { createFlag: (name?: string) => ERR_NAME_EXISTS | ERR_INVALID_ARGS | string } | null {
+  const roomNames = Object.keys(rooms);
+
+  for (const roomName of roomNames) {
+    const room = rooms[roomName] as unknown as FlagGuidanceRoom;
+    const createFlag = room.controller?.pos?.createFlag;
+
+    if (createFlag) {
+      return {
+        createFlag: createFlag.bind(room.controller?.pos)
+      };
+    }
+  }
+
+  return null;
 }
