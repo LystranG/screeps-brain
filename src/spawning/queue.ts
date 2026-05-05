@@ -1,6 +1,6 @@
+import { ColonyMemory, ProjectMemoryShape, SpawnRequestMemory } from "memory/schema";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
-import { ColonyMemory, ProjectMemoryShape, SpawnRequestMemory } from "memory/schema";
 
 export interface CreateSpawnRequestParams {
   id: string;

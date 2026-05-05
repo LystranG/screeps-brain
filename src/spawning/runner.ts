@@ -1,11 +1,11 @@
-import { ColonyContext } from "colony/types";
-import { ProjectMemoryShape } from "memory/schema";
 import {
+  SelectedSpawnRequest,
   markSpawnRequestError,
   markSpawnRequestValidated,
-  SelectedSpawnRequest,
   selectNextSpawnRequest
 } from "spawning/queue";
+import { ColonyContext } from "colony/types";
+import { ProjectMemoryShape } from "memory/schema";
 
 export interface SpawnValidationResult {
   ok: boolean;
