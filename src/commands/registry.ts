@@ -1,5 +1,10 @@
 import { CommandContext, CommandNamespaceDefinition, CommandRegistry, CommandResult } from "commands/types";
 import { CommandEffect } from "constants/commands";
+import { createConfigNamespace } from "commands/namespaces/config";
+import { createDebugNamespace } from "commands/namespaces/debug";
+import { createEnvNamespace } from "commands/namespaces/env";
+import { createFutureNamespaces } from "commands/namespaces/future";
+import { createSimNamespace } from "commands/namespaces/sim";
 import { recordCommandHistory } from "commands/history";
 
 function errorResult(message: string): CommandResult {
@@ -51,4 +56,14 @@ export function createCommandRegistry(namespaces: readonly CommandNamespaceDefin
       return namespaces;
     }
   };
+}
+
+export function createDefaultCommandRegistry(): CommandRegistry {
+  return createCommandRegistry([
+    createEnvNamespace(),
+    createSimNamespace(),
+    createConfigNamespace(),
+    createDebugNamespace(),
+    ...createFutureNamespaces()
+  ]);
 }
