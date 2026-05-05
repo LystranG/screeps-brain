@@ -13,7 +13,7 @@ This roadmap builds lystran-brain from the existing Screeps TypeScript starter i
 | 1 | Runtime and Memory Foundation | Replace starter loop with a tested kernel, typed memory, constants, and baseline verification. | RUN-01, RUN-02, RUN-03, RUN-04, MEM-01, MEM-02, MEM-03, TYP-01, TYP-02, TYP-03, TEST-01, TEST-06 |
 | 2 | Observability and Environment Infrastructure | Add logger, profiler, stats, environment detection, and sim bootstrap infrastructure. | MEM-04, OBS-01, OBS-02, OBS-03, OBS-04, ENV-01, ENV-02, SIM-01, SIM-02, SIM-03, TEST-02, TEST-04 |
 | 3 | Console Command System | Complete 2026-05-05 — safe manual control and inspection through a scalable console command tree verified. | CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06, TEST-03 |
-| 4 | Colony and Behavior Primitives | Add colony context, room intel, process, role, task, spawn queue, and body builder abstractions. | COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05 |
+| 4 | Colony and Behavior Primitives | Complete 2026-05-05 — colony context, room intel, process, role, task, spawn queue, body builder, read-only commands, and kernel wiring verified. | COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05 |
 | 5 | Strategy and Policy Planning | Add explainable semi-automatic long-term planning with policy gates and sim handoff. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
 | 6 | Minimal RCL1 Bootstrap Loop | Use the foundation to maintain workers, harvest energy, and upgrade a controller in sim or a normal room. | BOOT-01, BOOT-02, BOOT-03, BOOT-04 |
 
@@ -93,20 +93,20 @@ Plans:
 
 ## Phase 4: Colony and Behavior Primitives
 
-**Status:** In Progress — 3/5 plans complete.
+**Status:** Complete — verified 2026-05-05 with all Phase 4 plans and verification gates passing.
 
 **Goal:** Establish the domain abstractions needed to add behavior without coupling modules to global scans or one-off role logic.
 
 **Requirements:** COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05
 
-**Plans:** 4/5 plans complete
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Add typed Memory and constants foundation for Phase 4 primitives.
 - [x] 04-02-PLAN.md — Create colony context and room intel primitives without behavior execution.
 - [x] 04-03-PLAN.md — Add process, role, and task primitives with cadence-aware runner and no-op role skeletons.
 - [x] 04-04-PLAN.md — Add spawn queue, body builder, and dry-run validation primitives.
-- [ ] 04-05-PLAN.md — Pending
+- [x] 04-05-PLAN.md — Wire Phase 4 primitives into Kernel and expose read-only colony/spawn command inspection.
 
 **Success Criteria:**
 1. The system can build a `ColonyContext` for each owned room or sim candidate.
