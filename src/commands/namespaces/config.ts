@@ -1,4 +1,4 @@
-import { validateBooleanArgument, validateSamplingRate } from "commands/arguments";
+import { validateBooleanArgument, validateConfirmToken, validateSamplingRate } from "commands/arguments";
 import { CommandContext, CommandDefinition, CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
 import { validateLogLevel } from "validation/runtime";
@@ -18,6 +18,15 @@ function errorResult(message: string, effect: CommandEffect = CommandEffect.writ
     status: "ERR",
     message,
     effect
+  };
+}
+
+function confirmResult(message: string): CommandResult {
+  return {
+    ok: false,
+    status: "CONFIRM",
+    message,
+    effect: CommandEffect.requiresConfirm
   };
 }
 
@@ -136,6 +145,65 @@ function createNamespaceEnabledCommand(): CommandDefinition {
   };
 }
 
+function createManualToggleCommand(
+  name: "construction" | "defense",
+  signature: string,
+  getValue: (context: CommandContext) => boolean,
+  setValue: (context: CommandContext, value: boolean) => void
+): CommandDefinition {
+  return {
+    name,
+    signature,
+    description: `Toggle Memory.config.${name}.enabled.`,
+    effect: CommandEffect.writesMemory,
+    run(args: readonly unknown[], context: CommandContext): CommandResult {
+      const validation = validateBooleanArgument(args[0]);
+
+      if (!validation.ok) {
+        return errorResult(validation.reason);
+      }
+
+      const previous = getValue(context);
+      setValue(context, validation.value);
+
+      return okResult(`${name}: ${previous} -> ${validation.value}`);
+    }
+  };
+}
+
+function createConfirmedToggleCommand(
+  name: "deepProfiler" | "allowExpansion" | "allowRemoteMining",
+  signature: string,
+  confirmMessage: string,
+  getValue: (context: CommandContext) => boolean,
+  setValue: (context: CommandContext, value: boolean) => void
+): CommandDefinition {
+  return {
+    name,
+    signature,
+    description: `Toggle ${name} after explicit CONFIRM.`,
+    effect: CommandEffect.requiresConfirm,
+    run(args: readonly unknown[], context: CommandContext): CommandResult {
+      const validation = validateBooleanArgument(args[0]);
+
+      if (!validation.ok) {
+        return errorResult(validation.reason, CommandEffect.requiresConfirm);
+      }
+
+      const confirmation = validateConfirmToken(args[1]);
+
+      if (!confirmation.ok) {
+        return confirmResult(confirmMessage);
+      }
+
+      const previous = getValue(context);
+      setValue(context, validation.value);
+
+      return okResult(`${name}: ${previous} -> ${validation.value}`, CommandEffect.requiresConfirm);
+    }
+  };
+}
+
 export function createConfigNamespace(): CommandNamespaceDefinition {
   return {
     name: CommandPath.config,
@@ -145,7 +213,50 @@ export function createConfigNamespace(): CommandNamespaceDefinition {
       createLogLevelCommand(),
       createProfilerCommand(),
       createNamespaceSamplingCommand(),
-      createNamespaceEnabledCommand()
+      createNamespaceEnabledCommand(),
+      createManualToggleCommand(
+        "construction",
+        "cmd.config.construction(enabled)",
+        context => context.memory.config.construction.enabled,
+        (context, value) => {
+          context.memory.config.construction.enabled = value;
+        }
+      ),
+      createManualToggleCommand(
+        "defense",
+        "cmd.config.defense(enabled)",
+        context => context.memory.config.defense.enabled,
+        (context, value) => {
+          context.memory.config.defense.enabled = value;
+        }
+      ),
+      createConfirmedToggleCommand(
+        "deepProfiler",
+        "cmd.config.deepProfiler(enabled, confirm?)",
+        "deepProfiler requires CONFIRM",
+        context => context.memory.config.observability.deepProfiler.enabled,
+        (context, value) => {
+          context.memory.config.observability.deepProfiler.enabled = value;
+        }
+      ),
+      createConfirmedToggleCommand(
+        "allowExpansion",
+        "cmd.config.allowExpansion(enabled, confirm?)",
+        "allowExpansion requires CONFIRM",
+        context => context.memory.config.strategy.allowExpansion,
+        (context, value) => {
+          context.memory.config.strategy.allowExpansion = value;
+        }
+      ),
+      createConfirmedToggleCommand(
+        "allowRemoteMining",
+        "cmd.config.allowRemoteMining(enabled, confirm?)",
+        "allowRemoteMining requires CONFIRM",
+        context => context.memory.config.strategy.allowRemoteMining,
+        (context, value) => {
+          context.memory.config.strategy.allowRemoteMining = value;
+        }
+      )
     ]
   };
 }
