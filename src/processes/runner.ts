@@ -1,9 +1,9 @@
-import { ColonyContext } from "colony/types";
-import { ProcessName } from "constants/processes";
-import { ProcessMemory } from "memory/schema";
 import { ProcessDefinition, ProcessDefinitionResult, ProcessRunResult, ProcessRunnerContext } from "processes/types";
-import { RuntimeServices } from "runtime/services";
 import { RoleRegistry, createDefaultRoleRegistry } from "roles/registry";
+import { ColonyContext } from "colony/types";
+import { ProcessMemory } from "memory/schema";
+import { ProcessName } from "constants/processes";
+import { RuntimeServices } from "runtime/services";
 
 export function runProcessDefinitions(
   contexts: readonly ColonyContext[],
