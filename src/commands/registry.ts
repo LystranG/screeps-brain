@@ -67,7 +67,7 @@ export function createDefaultCommandRegistry(): CommandRegistry {
     createConfigNamespace(),
     createDebugNamespace(),
     createColonyNamespace(),
-    createSpawnNamespace(),
-    ...createFutureNamespaces()
+    ...createFutureNamespaces(),
+    createSpawnNamespace()
   ]);
 }

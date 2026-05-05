@@ -1,8 +1,8 @@
-import { buildColonyContexts } from "colony/context";
-import { ColonyContext } from "colony/types";
 import { CommandContext, CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { ColonyContext } from "colony/types";
 import { ProcessMemory } from "memory/schema";
+import { buildColonyContexts } from "colony/context";
 
 interface ColonyInspectionSnapshot {
   contexts: ColonyContext[];
@@ -156,7 +156,7 @@ function formatDetail(colony: ColonyContext): string {
   const missing = colony.missingReasons.length === 0 ? "none" : colony.missingReasons.join(",");
 
   return [
-    `primary=${colony.primary}`,
+    `primary=${String(colony.primary)}`,
     `readiness=${colony.readiness}`,
     `stage=${stage}`,
     `controller=${controller}`,

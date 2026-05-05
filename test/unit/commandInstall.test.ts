@@ -50,9 +50,9 @@ describe("command install|registry assembly", () => {
     assert.include(help, "cmd.colony.help()");
     assert.include(help, "cmd.strategy.help()");
     assert.include(help, "cmd.spawn.help()");
-    assert.include(help, "requires colony context phase");
     assert.include(help, "requires strategy planning phase");
-    assert.include(help, "requires spawn queue phase");
+    assert.include(help, "Read-only colony context inspection commands");
+    assert.include(help, "Read-only spawn queue and dry-run inspection commands");
   });
 
   it("executes representative handlers from implemented and future namespaces", () => {
@@ -62,7 +62,7 @@ describe("command install|registry assembly", () => {
 
     assert.equal(registry.execute(["env", "status"], [], context).status, "OK");
     assert.equal(registry.execute(["config", "logLevel"], ["debug"], context).status, "OK");
-    assert.equal(registry.execute(["spawn", "status"], [], context).status, "FUTURE");
+    assert.equal(registry.execute(["spawn", "status"], [], context).status, "OK");
     assert.equal(memory.config.observability.logLevel, "debug");
   });
 });
@@ -90,6 +90,8 @@ describe("command install|global cmd", () => {
       };
       spawn: {
         help(): string;
+        dryRun(room?: string, role?: string, energy?: number): string;
+        queue(): string;
         status(): string;
       };
     };
@@ -141,7 +143,7 @@ describe("command install|global cmd", () => {
     assert.include(cmd.env.status(), "OK env status:");
     assert.include(cmd.config.logLevel("debug"), "OK logLevel: debug -> debug");
     assert.include(cmd.debug.dump("Memory.config", 200), "OK debug dump Memory.config:");
-    assert.include(cmd.spawn.status(), "FUTURE spawn commands require spawn queue phase");
+    assert.include(cmd.spawn.status(), "OK spawn status:");
   });
 
   it("reuses same-version cmd and rebuilds stale version bindings", () => {

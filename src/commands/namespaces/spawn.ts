@@ -1,10 +1,10 @@
-import { buildColonyContexts } from "colony/context";
-import { ColonyContext } from "colony/types";
 import { CommandContext, CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { SpawnRequestMemory } from "memory/schema";
 import { buildBody } from "spawning/bodyBuilder";
+import { buildColonyContexts } from "colony/context";
 
 const DefaultRole: RoleName = "worker";
 const RoleNames: readonly RoleName[] = ["worker", "harvester", "upgrader", "builder"];

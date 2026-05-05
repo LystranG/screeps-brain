@@ -1,9 +1,9 @@
 import { KERNEL_STAGE_ORDER, LifecycleStage, LifecycleStageName } from "runtime/lifecycle";
 import { RuntimeServices, createRuntimeServices } from "runtime/services";
-import { buildColonyContexts } from "colony/context";
-import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
-import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
 import { createDefaultProcessDefinitions, runProcessDefinitions } from "processes/runner";
+import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
+import { buildColonyContexts } from "colony/context";
+import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
 import { flushRuntimeStats } from "stats/Stats";
 import { installConsoleCommands } from "commands/installer";
 import { runMemoryMigrations } from "memory/migrations";
