@@ -53,9 +53,9 @@
 ### Colony And Domain Model
 
 - [x] **COL-01**: The system builds a `ColonyContext` for each owned room or detected sim colony candidate.
-- [ ] **COL-02**: `ColonyContext` aggregates current room, controller, spawns, sources, creeps, construction sites, hostiles, and energy state.
+- [x] **COL-02**: `ColonyContext` aggregates current room, controller, spawns, sources, creeps, construction sites, hostiles, and energy state.
 - [x] **COL-03**: Room intel is cached separately from persistent memory and can be refreshed on a controlled cadence.
-- [ ] **COL-04**: Domain modules use context/service abstractions instead of scanning global `Game` objects ad hoc.
+- [x] **COL-04**: Domain modules use context/service abstractions instead of scanning global `Game` objects ad hoc.
 
 ### Behavior Framework
 
@@ -151,9 +151,9 @@
 | CMD-05 | Phase 3 | Complete |
 | CMD-06 | Phase 3 | Complete |
 | COL-01 | Phase 4 | Complete |
-| COL-02 | Phase 4 | Pending |
+| COL-02 | Phase 4 | Complete |
 | COL-03 | Phase 4 | Complete |
-| COL-04 | Phase 4 | Pending |
+| COL-04 | Phase 4 | Complete |
 | BEH-01 | Phase 4 | Pending |
 | BEH-02 | Phase 4 | Complete |
 | BEH-03 | Phase 4 | Complete |

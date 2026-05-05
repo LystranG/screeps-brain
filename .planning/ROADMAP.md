@@ -93,17 +93,17 @@ Plans:
 
 ## Phase 4: Colony and Behavior Primitives
 
-**Status:** In Progress — 1/5 plans complete.
+**Status:** In Progress — 2/5 plans complete.
 
 **Goal:** Establish the domain abstractions needed to add behavior without coupling modules to global scans or one-off role logic.
 
 **Requirements:** COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05
 
-**Plans:** 1/5 plans complete
+**Plans:** 2/5 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Add typed Memory and constants foundation for Phase 4 primitives.
-- [ ] 04-02-PLAN.md — Pending
+- [x] 04-02-PLAN.md — Create colony context and room intel primitives without behavior execution.
 - [ ] 04-03-PLAN.md — Pending
 - [ ] 04-04-PLAN.md — Pending
 - [ ] 04-05-PLAN.md — Pending
@@ -189,9 +189,9 @@ Plans:
 | CMD-05 | Phase 3 | Complete |
 | CMD-06 | Phase 3 | Complete |
 | COL-01 | Phase 4 | Complete |
-| COL-02 | Phase 4 | Pending |
+| COL-02 | Phase 4 | Complete |
 | COL-03 | Phase 4 | Complete |
-| COL-04 | Phase 4 | Pending |
+| COL-04 | Phase 4 | Complete |
 | BEH-01 | Phase 4 | Pending |
 | BEH-02 | Phase 4 | Complete |
 | BEH-03 | Phase 4 | Complete |
