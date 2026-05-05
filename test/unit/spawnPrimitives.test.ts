@@ -10,6 +10,18 @@ import {
   selectNextSpawnRequest
 } from "spawning/queue";
 
+before(() => {
+  const globals = global as unknown as { [name: string]: unknown };
+  globals.WORK = "work";
+  globals.CARRY = "carry";
+  globals.MOVE = "move";
+  globals.BODYPART_COST = {
+    work: 100,
+    carry: 50,
+    move: 50
+  };
+});
+
 describe("spawn primitives body builder", () => {
   it("builds worker-style bodies from intent templates and derived costs", () => {
     const result = buildBody({

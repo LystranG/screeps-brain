@@ -23,22 +23,6 @@ interface BodyTemplate {
 
 const MINIMUM_BODY_COST = 200;
 
-const TEMPLATE_BY_INTENT: Record<BodyIntent, BodyTemplate> = {
-  balanced: {
-    body: [WORK, CARRY, MOVE]
-  },
-  harvest: {
-    body: [WORK, WORK, CARRY, MOVE],
-    fallback: [WORK, CARRY, MOVE]
-  },
-  upgrade: {
-    body: [WORK, CARRY, MOVE]
-  },
-  build: {
-    body: [WORK, CARRY, MOVE]
-  }
-};
-
 export function calculateBodyCost(body: BodyPartConstant[]): number {
   return body.reduce((sum, part) => sum + BODYPART_COST[part], 0);
 }
@@ -53,7 +37,7 @@ export function buildBody(request: BodyBuildRequest): BodyBuildResult {
     };
   }
 
-  const template = TEMPLATE_BY_INTENT[request.intent];
+  const template = createTemplatesByIntent()[request.intent];
   const preferredCost = calculateBodyCost(template.body);
 
   if (preferredCost <= request.energyBudget) {
@@ -84,5 +68,23 @@ export function buildBody(request: BodyBuildRequest): BodyBuildResult {
     body: [],
     cost: 0,
     reason: `${request.role} ${request.intent} template cost exceeds energy budget`
+  };
+}
+
+function createTemplatesByIntent(): Record<BodyIntent, BodyTemplate> {
+  return {
+    balanced: {
+      body: [WORK, CARRY, MOVE]
+    },
+    harvest: {
+      body: [WORK, WORK, CARRY, MOVE],
+      fallback: [WORK, CARRY, MOVE]
+    },
+    upgrade: {
+      body: [WORK, CARRY, MOVE]
+    },
+    build: {
+      body: [WORK, CARRY, MOVE]
+    }
   };
 }

@@ -100,7 +100,7 @@ export interface SpawnRequestMemory {
   memory: CreepMemory;
   reason: string;
   requestedTick: number;
-  status: "queued" | "validating" | "blocked" | "spawning" | "spawned" | "failed";
+  status: "queued" | "validating" | "validated" | "blocked" | "spawning" | "spawned" | "failed";
   attempts: number;
   lastError: string | null;
 }
