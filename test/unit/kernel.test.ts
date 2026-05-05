@@ -7,6 +7,13 @@ import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecy
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
 describe("kernel|stats cleanup|kernel runtime kernel", () => {
+  interface KernelCommandGlobalState {
+    cmd?: {
+      help(): string;
+    };
+    __cmdApiVersion?: number;
+  }
+
   let consoleLog: sinon.SinonStub | null = null;
 
   beforeEach(() => {
@@ -14,6 +21,8 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     global.Game = createMockGame();
     // @ts-ignore : allow adding Memory to global
     global.Memory = createMockMemory();
+    delete (global as unknown as KernelCommandGlobalState).cmd;
+    delete (global as unknown as KernelCommandGlobalState).__cmdApiVersion;
   });
 
   afterEach(() => {
@@ -21,6 +30,9 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
       consoleLog.restore();
       consoleLog = null;
     }
+
+    delete (global as unknown as KernelCommandGlobalState).cmd;
+    delete (global as unknown as KernelCommandGlobalState).__cmdApiVersion;
   });
 
   it("executes lifecycle stages in the required order", () => {
@@ -38,6 +50,16 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.deepEqual(result.executedStages, expectedStageOrder);
     assert.deepEqual(observedStages, expectedStageOrder);
     assert.deepEqual(result.failures, []);
+    assert.deepEqual(expectedStageOrder, [
+      "migrate",
+      "refreshServices",
+      "installCommands",
+      "detectEnvironmentBootstrap",
+      "runColoniesAndProcesses",
+      "runSpawning",
+      "cleanup",
+      "flushStats"
+    ]);
   });
 
   it("blocks later stages when migration fails", () => {
@@ -112,7 +134,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.isTrue(consoleLog.calledOnceWith("Kernel stage refreshServices failed: refresh failed"));
   });
 
-  it("runs the integrated lifecycle with services, environment, cleanup profiling, and stats", () => {
+  it("runs the integrated lifecycle with services, command install, environment, cleanup profiling, and stats", () => {
     const game = mockGame();
     const memory = mockMemory();
 
@@ -128,8 +150,11 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.isTrue(memory.stats.cpu.available);
     assert.equal(memory.runtime.environment.type, RuntimeEnvironment.world);
     assert.equal(memory.runtime.environment.shard, "shard0");
+    assert.exists((global as unknown as KernelCommandGlobalState).cmd);
+    assert.isString((global as unknown as KernelCommandGlobalState).cmd?.help());
     assert.isAtLeast(memory.stats.cpu.stages.cleanup.samples, 1);
     assert.containsAllKeys(memory.stats.cpu.stages, [
+      "installCommands",
       "detectEnvironmentBootstrap",
       "runColoniesAndProcesses",
       "runSpawning",
@@ -167,6 +192,43 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.isTrue(consoleLog.calledWith("Kernel stage runSpawning failed: failed stage"));
   });
 
+  it("continues after command install failed while later stages still run", () => {
+    consoleLog = sinon.stub(console, "log");
+    const observedStages: LifecycleStageName[] = [];
+    const stages: LifecycleStageOverrides = {
+      installCommands: () => {
+        observedStages.push("installCommands");
+        throw new Error("command install failed");
+      },
+      detectEnvironmentBootstrap: () => observedStages.push("detectEnvironmentBootstrap"),
+      runColoniesAndProcesses: () => observedStages.push("runColoniesAndProcesses"),
+      runSpawning: () => observedStages.push("runSpawning"),
+      cleanup: () => observedStages.push("cleanup"),
+      flushStats: () => observedStages.push("flushStats")
+    };
+
+    const result = new Kernel({ stages }).run();
+
+    assert.isFalse(result.ok);
+    assert.include(result.executedStages, "installCommands");
+    assert.include(result.executedStages, "cleanup");
+    assert.deepEqual(result.failures, [
+      {
+        stage: "installCommands",
+        message: "command install failed"
+      }
+    ]);
+    assert.deepEqual(observedStages, [
+      "installCommands",
+      "detectEnvironmentBootstrap",
+      "runColoniesAndProcesses",
+      "runSpawning",
+      "cleanup",
+      "flushStats"
+    ]);
+    assert.isTrue(consoleLog.calledWith("Kernel stage installCommands failed: command install failed"));
+  });
+
   it("runs dead creep memory cleanup in the cleanup stage", () => {
     consoleLog = sinon.stub(console, "log");
     const observedStages: LifecycleStageName[] = [];
@@ -195,6 +257,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.deepEqual(observedStages, [
       "migrate",
       "refreshServices",
+      "installCommands",
       "detectEnvironmentBootstrap",
       "runColoniesAndProcesses",
       "runSpawning",
