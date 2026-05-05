@@ -1,5 +1,5 @@
-import { CommandEffect } from "constants/commands";
 import { CommandNamespaceDefinition, CommandResult } from "commands/types";
+import { CommandEffect } from "constants/commands";
 
 export function formatCommandResult(result: CommandResult): string {
   return `${result.status} ${result.message}`;

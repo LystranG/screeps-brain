@@ -1,6 +1,6 @@
+import { CommandContext, CommandNamespaceDefinition, CommandRegistry, CommandResult } from "commands/types";
 import { CommandEffect } from "constants/commands";
 import { recordCommandHistory } from "commands/history";
-import { CommandContext, CommandNamespaceDefinition, CommandRegistry, CommandResult } from "commands/types";
 
 function errorResult(message: string): CommandResult {
   return {

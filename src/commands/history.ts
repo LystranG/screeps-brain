@@ -1,6 +1,6 @@
 import { COMMAND_HISTORY_LIMIT, CommandEffect } from "constants/commands";
-import { stringifyArgument } from "commands/arguments";
 import { CommandResult, CommandStatus } from "commands/types";
+import { stringifyArgument } from "commands/arguments";
 
 interface CommandHistoryRecord extends Record<string, unknown> {
   tick: number;
