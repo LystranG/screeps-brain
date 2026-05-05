@@ -2,9 +2,10 @@ import { assert } from "chai";
 import * as sinon from "sinon";
 import { RuntimeEnvironment } from "constants/runtime";
 import { CURRENT_MEMORY_VERSION, createDefaultProjectMemorySections } from "memory/schema";
+import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
-import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
+import { createMockGame, createMockMemory, createMockRoom, mockGame, mockMemory } from "./mock";
 
 describe("kernel|stats cleanup|kernel runtime kernel", () => {
   const expectedCommandStageOrder: LifecycleStageName[] = [
@@ -33,6 +34,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     global.Game = createMockGame();
     // @ts-ignore : allow adding Memory to global
     global.Memory = createMockMemory();
+    (global as unknown as { OK: ScreepsReturnCode }).OK = 0;
     delete (global as unknown as KernelCommandGlobalState).cmd;
     delete (global as unknown as KernelCommandGlobalState).__cmdApiVersion;
   });
@@ -174,6 +176,75 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     ]);
   });
 
+  it("runs colony context, process definitions, and dry-run spawning in the default lifecycle", () => {
+    const game = mockGame();
+    const memory = mockMemory() as Memory;
+    const spawn = createKernelSpawn("SpawnPrimary");
+
+    game.time = 200;
+    game.rooms = {
+      W1N1: createMockRoom({
+        name: "W1N1",
+        controller: { id: "controller-primary", my: true, level: 2 },
+        spawns: [spawn],
+        sources: [{ id: "source-a" }],
+        creeps: [{ name: "Worker1", memory: { role: "worker" } }],
+        constructionSites: [],
+        hostiles: [],
+        energyAvailable: 300,
+        energyCapacityAvailable: 550
+      }),
+      W2N2: createMockRoom({
+        name: "W2N2",
+        controller: { id: "controller-sim", my: false, level: 1 },
+        spawns: [],
+        sources: [],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [],
+        energyAvailable: 0,
+        energyCapacityAvailable: 0
+      })
+    };
+    game.spawns = {
+      SpawnPrimary: spawn
+    };
+
+    Object.assign(memory, {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    });
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-200",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "kernel dry-run validation",
+        requestedTick: 199
+      })
+    );
+
+    const result = new Kernel().run();
+
+    assert.isTrue(result.ok);
+    assert.equal(memory.config.colony.primaryRoomName, "W1N1");
+    assert.equal(memory.colonies.W1N1.status, "ready");
+    assert.equal(memory.colonies.W2N2.status, "degraded");
+    assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, ["missing spawn", "missing source"]);
+    assert.equal(memory.processes.colonyIntel.lastRunTick, 200);
+    assert.equal(memory.processes.creepRoles.lastRunTick, 200);
+    assert.include(memory.processes.creepRoles.lastResult ?? "", "role behavior deferred to Phase 6");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
+    assert.deepEqual(spawn.calls[0].options, {
+      memory: { role: "worker" },
+      dryRun: true
+    });
+  });
+
   it("records a failed stage sample and still reaches later lifecycle stages", () => {
     consoleLog = sinon.stub(console, "log");
     const game = mockGame();
@@ -289,4 +360,32 @@ function createCpuSequence(values: number[]): () => number {
 
     return value === undefined ? values[values.length - 1] : value;
   };
+}
+
+interface KernelSpawn extends StructureSpawn {
+  calls: Array<{
+    body: BodyPartConstant[];
+    name: string;
+    options: SpawnOptions;
+  }>;
+}
+
+function createKernelSpawn(name: string): KernelSpawn {
+  const calls: KernelSpawn["calls"] = [];
+
+  return {
+    id: `${name}-id`,
+    name,
+    spawning: null,
+    calls,
+    spawnCreep: (body: BodyPartConstant[], creepName: string, options: SpawnOptions): ScreepsReturnCode => {
+      calls.push({
+        body,
+        name: creepName,
+        options
+      });
+
+      return OK;
+    }
+  } as KernelSpawn;
 }
