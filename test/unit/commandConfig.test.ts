@@ -73,6 +73,43 @@ describe("command config|observability config", () => {
     assert.equal(memory.config.observability.profiler.enabled, false);
     assert.equal(memory.config.observability.namespaceSampling.stats, 10);
     assert.deepEqual(memory.config.observability.enabledNamespaces.stats, { enabled: false });
+    assert.deepEqual(Object.keys(memory.config.observability.namespaceSampling), ["stats"]);
+    assert.deepEqual(Object.keys(memory.config.observability.enabledNamespaces), ["stats"]);
+    assert.include(JSON.stringify(memory.config.observability.namespaceSampling), "\"stats\":10");
+    assert.include(JSON.stringify(memory.config.observability.enabledNamespaces), "\"stats\":{\"enabled\":false}");
+  });
+
+  it("rejects prototype-reserved namespace keys without mutating observability maps", () => {
+    const reservedNamespaceKeys = [
+      "__proto__",
+      "prototype",
+      "constructor"
+    ];
+    const memory = createCommandMemory();
+    const namespace = createConfigNamespace();
+    const namespaceSampling = namespace.commands.find(candidate => candidate.name === "namespaceSampling");
+    const namespaceEnabled = namespace.commands.find(candidate => candidate.name === "namespaceEnabled");
+
+    assert.exists(namespaceSampling);
+    assert.exists(namespaceEnabled);
+
+    for (const namespaceKey of reservedNamespaceKeys) {
+      const samplingResult = namespaceSampling?.run([namespaceKey, 10], createContext(memory));
+      const enabledResult = namespaceEnabled?.run([namespaceKey, false], createContext(memory));
+
+      assert.equal(samplingResult?.status, "ERR");
+      assert.equal(samplingResult?.ok, false);
+      assert.equal(enabledResult?.status, "ERR");
+      assert.equal(enabledResult?.ok, false);
+    }
+
+    assert.deepEqual(Object.keys(memory.config.observability.namespaceSampling), []);
+    assert.deepEqual(Object.keys(memory.config.observability.enabledNamespaces), []);
+
+    for (const namespaceKey of reservedNamespaceKeys) {
+      assert.equal(Object.prototype.hasOwnProperty.call(memory.config.observability.namespaceSampling, namespaceKey), false);
+      assert.equal(Object.prototype.hasOwnProperty.call(memory.config.observability.enabledNamespaces, namespaceKey), false);
+    }
   });
 
   it("does not expose a generic set command", () => {
