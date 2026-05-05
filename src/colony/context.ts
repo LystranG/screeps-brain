@@ -1,4 +1,3 @@
-import { buildVolatileRoomIntel, persistColonyIntel } from "colony/intel";
 import {
   BuildColonyContextResult,
   ColonyContext,
@@ -6,6 +5,7 @@ import {
   ColonyStageSummary,
   VolatileRoomIntel
 } from "colony/types";
+import { buildVolatileRoomIntel, persistColonyIntel } from "colony/intel";
 import { ColonyIntelMemory } from "memory/schema";
 
 export interface BuildColonyContextsOptions {

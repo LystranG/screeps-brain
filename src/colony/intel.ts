@@ -1,5 +1,5 @@
-import { VolatileRoomIntel } from "colony/types";
 import { ColonyIntelMemory, ColonyMemory } from "memory/schema";
+import { VolatileRoomIntel } from "colony/types";
 
 export function buildVolatileRoomIntel(room: Room, game: Game): VolatileRoomIntel {
   const spawns = room.find(FIND_MY_SPAWNS);
