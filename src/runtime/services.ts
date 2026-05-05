@@ -1,8 +1,8 @@
-import { ShardName } from "constants/runtime";
 import { Logger, LoggerConfig } from "logging/Logger";
 import { ObservabilityConfigMemory } from "memory/schema";
 import { Profiler } from "profiling/Profiler";
 import { RuntimeEnvironmentMetadata } from "environment/detection";
+import { ShardName } from "constants/runtime";
 
 export interface RuntimeServices {
   logger: Logger;

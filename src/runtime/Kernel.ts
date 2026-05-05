@@ -1,10 +1,10 @@
 import { KERNEL_STAGE_ORDER, LifecycleStage, LifecycleStageName } from "runtime/lifecycle";
-import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
-import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
-import { runSimBootstrap } from "environment/simBootstrap";
-import { runMemoryMigrations } from "memory/migrations";
 import { RuntimeServices, createRuntimeServices } from "runtime/services";
+import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
+import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
 import { flushRuntimeStats } from "stats/Stats";
+import { runMemoryMigrations } from "memory/migrations";
+import { runSimBootstrap } from "environment/simBootstrap";
 
 export interface KernelStageFailure {
   stage: LifecycleStageName;
