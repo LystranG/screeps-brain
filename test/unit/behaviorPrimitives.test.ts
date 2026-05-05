@@ -1,7 +1,9 @@
 import { assert } from "chai";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
-import { TaskMemory } from "memory/schema";
+import { ProcessMemory, TaskMemory } from "memory/schema";
+import { ProcessDefinition } from "processes/types";
+import { createDefaultProcessDefinitions, runProcessDefinitions } from "processes/runner";
 import { RuntimeServices } from "runtime/services";
 import { createDefaultRoleRegistry } from "roles/registry";
 import { clearTaskMemory, createTaskMemory, TaskStatus, TaskType, validateTaskMemory } from "tasks/model";
@@ -110,6 +112,144 @@ describe("behavior primitives role registry", () => {
   });
 });
 
+describe("behavior primitives process runner", () => {
+  it("runs process definitions by priority and records cadence state", () => {
+    const memory = createProcessMemory();
+    const observed: string[] = [];
+    const definitions: ProcessDefinition[] = [
+      createProcessDefinition("slow", 20, 5, () => {
+        observed.push("slow");
+        return { status: "ok", message: "slow ran" };
+      }),
+      createProcessDefinition("fast", 10, 3, () => {
+        observed.push("fast");
+        return { status: "ok", message: "fast ran" };
+      })
+    ];
+
+    const results = runProcessDefinitions([], {} as RuntimeServices, memory, {} as Game, 100, definitions);
+
+    assert.deepEqual(observed, ["fast", "slow"]);
+    assert.deepEqual(
+      results.map((result: { processId: string }) => result.processId),
+      ["fast", "slow"]
+    );
+    assert.equal(memory.processes.fast.lastRunTick, 100);
+    assert.equal(memory.processes.fast.lastResult, "fast ran");
+    assert.isNull(memory.processes.fast.lastError);
+    assert.equal(memory.processes.fast.nextRunTick, 103);
+    assert.equal(memory.processes.slow.nextRunTick, 105);
+  });
+
+  it("skips disabled and future scheduled processes without clobbering status", () => {
+    const memory = createProcessMemory({
+      disabled: {
+        id: "disabled",
+        name: "disabled",
+        enabled: false,
+        priority: 1,
+        cadence: 10,
+        nextRunTick: 0,
+        lastRunTick: null,
+        lastResult: null,
+        lastError: null
+      },
+      future: {
+        id: "future",
+        name: "future",
+        enabled: true,
+        priority: 2,
+        cadence: 10,
+        nextRunTick: 120,
+        lastRunTick: 80,
+        lastResult: "previous",
+        lastError: null
+      }
+    });
+
+    const results = runProcessDefinitions(
+      [],
+      {} as RuntimeServices,
+      memory,
+      {} as Game,
+      100,
+      [
+        createProcessDefinition("disabled", 1, 10, () => assert.fail("disabled should not run")),
+        createProcessDefinition("future", 2, 10, () => assert.fail("future should not run"))
+      ]
+    );
+
+    assert.deepEqual(
+      results.map((result: { status: string }) => result.status),
+      ["skipped", "skipped"]
+    );
+    assert.isNull(memory.processes.disabled.lastRunTick);
+    assert.equal(memory.processes.future.lastRunTick, 80);
+    assert.equal(memory.processes.future.lastResult, "previous");
+    assert.isNull(memory.processes.future.lastError);
+  });
+
+  it("isolates process errors and continues later processes", () => {
+    const memory = createProcessMemory();
+    const observed: string[] = [];
+
+    const results = runProcessDefinitions(
+      [],
+      {} as RuntimeServices,
+      memory,
+      {} as Game,
+      110,
+      [
+        createProcessDefinition("boom", 1, 1, () => {
+          observed.push("boom");
+          throw new Error("process failed");
+        }),
+        createProcessDefinition("after", 2, 1, () => {
+          observed.push("after");
+          return { status: "ok", message: "after ran" };
+        })
+      ]
+    );
+
+    assert.deepEqual(observed, ["boom", "after"]);
+    assert.equal(results[0].status, "error");
+    assert.equal(memory.processes.boom.lastRunTick, 110);
+    assert.equal(memory.processes.boom.lastError, "process failed");
+    assert.equal(memory.processes.after.lastResult, "after ran");
+  });
+
+  it("creates default process definitions and dispatches creep.memory.role through the registry", () => {
+    const calls: string[] = [];
+    const colony = {
+      roomName: "W1N1",
+      creeps: [createNoopCreep(RoleName.worker), createNoopCreep("miner")]
+    } as unknown as ColonyContext;
+    const roleRegistry = {
+      run(roleName: string): { ok: boolean; status: "blocked"; reason: string } {
+        calls.push(roleName);
+
+        return {
+          ok: roleName !== "miner",
+          status: "blocked",
+          reason: roleName === "miner" ? "unknown role: miner" : "role behavior deferred to Phase 6"
+        };
+      }
+    };
+    const definitions = createDefaultProcessDefinitions(
+      roleRegistry as unknown as ReturnType<typeof createDefaultRoleRegistry>
+    );
+    const results = runProcessDefinitions([colony], {} as RuntimeServices, createProcessMemory(), {} as Game, 120, definitions);
+
+    assert.deepEqual(
+      definitions.map((definition: { id: string }) => definition.id),
+      ["colonyIntel", "creepRoles"]
+    );
+    assert.deepEqual(calls, [RoleName.worker, "miner"]);
+    assert.equal(results[1].status, "ok");
+    assert.include(results[1].message, "unknown role: miner");
+  });
+});
+
 function createRoleContext(): { colony: ColonyContext; services: RuntimeServices; game: Game; tick: number } {
   return {
     colony: {
@@ -133,4 +273,26 @@ function createNoopCreep(role: string): Creep {
       role
     }
   } as unknown as Creep;
+}
+
+function createProcessMemory(processes: Record<string, ProcessMemory> = {}): Memory {
+  return {
+    processes
+  } as Memory;
+}
+
+function createProcessDefinition(
+  id: string,
+  priority: number,
+  cadence: number,
+  run: ProcessDefinition["run"]
+): ProcessDefinition {
+  return {
+    id,
+    name: id,
+    enabled: true,
+    priority,
+    cadence,
+    run
+  };
 }
