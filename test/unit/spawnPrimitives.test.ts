@@ -2,14 +2,6 @@ import { assert } from "chai";
 import { buildBody, calculateBodyCost } from "spawning/bodyBuilder";
 
 describe("spawn primitives body builder", () => {
-  before(() => {
-    (global as unknown as { BODYPART_COST: Record<string, number> }).BODYPART_COST = {
-      work: 100,
-      carry: 50,
-      move: 50
-    };
-  });
-
   it("builds worker-style bodies from intent templates and derived costs", () => {
     const result = buildBody({
       role: "worker",

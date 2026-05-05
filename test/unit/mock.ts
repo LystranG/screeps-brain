@@ -10,9 +10,25 @@ const SCREEPS_STRUCTURE_CONSTANTS = {
   STRUCTURE_SPAWN: "spawn"
 };
 
+const SCREEPS_BODY_CONSTANTS = {
+  WORK: "work",
+  CARRY: "carry",
+  MOVE: "move"
+};
+
+const SCREEPS_BODY_COSTS = {
+  BODYPART_COST: {
+    work: 100,
+    carry: 50,
+    move: 50
+  }
+};
+
 for (const [constantName, constantValue] of Object.entries({
   ...SCREEPS_FIND_CONSTANTS,
-  ...SCREEPS_STRUCTURE_CONSTANTS
+  ...SCREEPS_STRUCTURE_CONSTANTS,
+  ...SCREEPS_BODY_CONSTANTS,
+  ...SCREEPS_BODY_COSTS
 })) {
   (global as unknown as { [name: string]: unknown })[constantName] = constantValue;
 }
