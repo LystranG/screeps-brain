@@ -2,6 +2,7 @@ import { assert } from "chai";
 import { CommandEffect } from "constants/commands";
 import { formatCommandResult, renderNamespaceHelp } from "commands/formatter";
 import { CommandContext } from "commands/types";
+import { createDebugNamespace } from "commands/namespaces/debug";
 import { createEnvNamespace } from "commands/namespaces/env";
 import { createSimNamespace } from "commands/namespaces/sim";
 import { createDefaultProjectMemorySections } from "memory/schema";
@@ -101,5 +102,92 @@ describe("command inspection|env|sim", () => {
       message: "sim guidance: none",
       effect: CommandEffect.readOnly
     });
+  });
+});
+
+describe("command inspection|debug|dump", () => {
+  function createInspectionMemory(): Memory {
+    return {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+  }
+
+  function createContext(memory: Memory): CommandContext {
+    return {
+      game: createMockGame() as unknown as Game,
+      memory
+    };
+  }
+
+  it("defines cmd.debug.stats() and cmd.debug.observability() as read-only summaries", () => {
+    const memory = createInspectionMemory();
+    memory.stats.ticks = 99;
+    memory.stats.cpu.available = true;
+    memory.stats.cpu.stages = {
+      migrate: {
+        last: 1.2,
+        average: 1.1,
+        max: 1.8,
+        samples: 3
+      }
+    };
+    memory.config.observability.logLevel = "debug";
+    memory.config.observability.profiler.enabled = true;
+    memory.config.observability.deepProfiler.enabled = false;
+    memory.config.observability.enabledNamespaces = {
+      kernel: { enabled: true },
+      sim: { enabled: false }
+    };
+    memory.config.observability.namespaceSampling = {
+      kernel: 10
+    };
+    const namespace = createDebugNamespace();
+
+    const help = renderNamespaceHelp(namespace);
+    const stats = namespace.commands[0].run([], createContext(memory));
+    const observability = namespace.commands[1].run([], createContext(memory));
+
+    assert.include(help, "cmd.debug.stats()");
+    assert.include(help, "cmd.debug.observability()");
+    assert.include(help, "cmd.debug.dump(path, maxLength?)");
+    assert.include(help, "Memory.runtime");
+    assert.include(help, "Memory.config");
+    assert.include(help, "Memory.stats");
+    assert.include(help, "Memory.commands");
+    assert.include(stats.message, "ticks=99");
+    assert.include(stats.message, "cpuAvailable=true");
+    assert.include(stats.message, "migrate");
+    assert.include(stats.message, "last=1.2");
+    assert.include(stats.message, "average=1.1");
+    assert.include(stats.message, "max=1.8");
+    assert.include(stats.message, "samples=3");
+    assert.include(observability.message, "logLevel=debug");
+    assert.include(observability.message, "profilerEnabled=true");
+    assert.include(observability.message, "deepProfilerEnabled=false");
+    assert.include(observability.message, "enabledNamespaces=2");
+    assert.include(observability.message, "namespaceSampling=1");
+  });
+
+  it("dumps only whitelisted Memory paths with bounded JSON output", () => {
+    const memory = createInspectionMemory();
+    memory.config.observability.logLevel = "warn";
+    memory.commands.history = [{ path: "config.status", status: "OK" }];
+    const namespace = createDebugNamespace();
+    const dump = namespace.commands[2];
+
+    const configDump = dump.run(["Memory.config", 200], createContext(memory));
+    const truncatedDump = dump.run(["Memory.commands", 20], createContext(memory));
+    const rejectedPath = dump.run(["screeps.json"], createContext(memory));
+    const rejectedLength = dump.run(["Memory.config", 0], createContext(memory));
+
+    assert.include(formatCommandResult(configDump), "OK debug dump Memory.config:");
+    assert.include(configDump.message, "\"logLevel\":\"warn\"");
+    assert.isAtMost(configDump.message.length, 230);
+    assert.include(truncatedDump.message, "...");
+    assert.equal(rejectedPath.status, "ERR");
+    assert.include(rejectedPath.message, "Dump path must be one of");
+    assert.equal(rejectedLength.status, "ERR");
+    assert.include(rejectedLength.message, "maxLength must be an integer from 1 through 2000");
   });
 });
