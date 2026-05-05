@@ -6,7 +6,7 @@ import { Profiler } from "profiling/Profiler";
 import { createScreepsProfilerAdapter } from "profiling/ScreepsProfilerAdapter";
 import { flushRuntimeStats } from "stats/Stats";
 
-describe("logger|profiler|stats|observability logger", () => {
+describe("environment|sim bootstrap|observability logger|profiler|stats|observability logger", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   afterEach(() => {
@@ -118,11 +118,25 @@ describe("profiler|stats|kernel observability services", () => {
   it("keeps sim CPU stats structurally present when available === false", () => {
     const memory = createMemoryWithDefaults();
 
-    flushRuntimeStats(memory, [{ stage: "migrate", duration: 0 }], false, 12);
+    flushRuntimeStats(
+      memory,
+      [
+        { stage: "migrate", duration: 0 },
+        { stage: "cleanup", duration: 0 }
+      ],
+      false,
+      12
+    );
 
     assert.equal(memory.stats.ticks, 12);
     assert.isFalse(memory.stats.cpu.available);
     assert.deepEqual(memory.stats.cpu.stages.migrate, {
+      last: 0,
+      average: 0,
+      max: 0,
+      samples: 1
+    });
+    assert.deepEqual(memory.stats.cpu.stages.cleanup, {
       last: 0,
       average: 0,
       max: 0,

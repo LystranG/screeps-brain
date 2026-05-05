@@ -4,7 +4,20 @@ import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "envir
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame } from "./mock";
 
-describe("environment detection", () => {
+describe("environment|sim bootstrap|observability environment detection", () => {
+  it("reports cpuAvailable false for sim and true for non-sim shards", () => {
+    const simGame = createMockGame();
+    const privateGame = createMockGame();
+    const unknownGame = createMockGame();
+
+    privateGame.shard.name = "private";
+    unknownGame.shard.name = "custom";
+
+    assert.isFalse(detectRuntimeEnvironment(simGame as unknown as Game).cpuAvailable);
+    assert.isTrue(detectRuntimeEnvironment(privateGame as unknown as Game).cpuAvailable);
+    assert.isTrue(detectRuntimeEnvironment(unknownGame as unknown as Game).cpuAvailable);
+  });
+
   it('classifies Game.shard.name === "sim" with CPU unavailable', () => {
     const game = createMockGame() as unknown as Game;
 

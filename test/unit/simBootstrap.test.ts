@@ -9,7 +9,7 @@ interface GuidanceWithFlagResult {
   flagResult?: string;
 }
 
-describe("sim bootstrap|environment|kernel", () => {
+describe("environment|sim bootstrap|observability sim bootstrap|environment|kernel", () => {
   it("no-ops outside sim", () => {
     const game = createMockGame();
     const memory = createMemoryWithDefaults();
@@ -20,6 +20,26 @@ describe("sim bootstrap|environment|kernel", () => {
 
     assert.deepEqual(result, { ran: false, ready: false });
     assert.equal(memory.runtime.sim.bootstrap.version, 0);
+  });
+
+  it("does not run sim bootstrap guidance for world, private, or unknown shards", () => {
+    const logger = new Logger({}, () => 2);
+    const warn = sinon.stub(logger, "warn");
+
+    ["shard1", "private", "custom"].forEach((shardName, index) => {
+      const game = createMockGame();
+      const memory = createMemoryWithDefaults();
+
+      game.shard.name = shardName;
+
+      const result = runSimBootstrap(memory, game as unknown as Game, logger, index + 2);
+
+      assert.deepEqual(result, { ran: false, ready: false });
+      assert.deepEqual(memory.runtime.sim.guidance, {});
+      assert.equal(memory.runtime.sim.bootstrap.version, 0);
+    });
+
+    assert.isFalse(warn.called);
   });
 
   it("records idempotent missing-object guidance and logger output once", () => {
@@ -137,17 +157,16 @@ describe("sim bootstrap|environment|kernel", () => {
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
   });
 
-  it("does not retry createFlag when Game.flags already contains the flag", () => {
+  it("does not retry createFlag when Game.flags already contains lystran-sim-source-needed", () => {
     const game = createMockGame();
     const memory = createMemoryWithDefaults();
     const logger = new Logger({}, () => 50);
     sinon.stub(logger, "warn");
     const createFlag = sinon.stub().returns("lystran-sim-source-needed");
 
+    // Game.flags 已有视觉提示时，只跳过对应 flag，其他 guidance 仍可创建。
     game.flags = {
-      "lystran-sim-source-needed": {},
-      "lystran-sim-spawn-needed": {},
-      "lystran-sim-creep-needed": {}
+      "lystran-sim-source-needed": {}
     };
     game.rooms = {
       W1N1: {
@@ -161,7 +180,9 @@ describe("sim bootstrap|environment|kernel", () => {
 
     runSimBootstrap(memory, game as unknown as Game, logger, 50);
 
-    assert.isFalse(createFlag.called);
+    assert.isFalse(createFlag.calledWith("lystran-sim-source-needed"));
+    assert.isTrue(createFlag.calledWith("lystran-sim-spawn-needed"));
+    assert.isTrue(createFlag.calledWith("lystran-sim-creep-needed"));
     assert.equal(guidanceFlagResult(memory, "missing-source"), "exists");
   });
 
