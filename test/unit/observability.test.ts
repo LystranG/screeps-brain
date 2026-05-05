@@ -6,7 +6,7 @@ import { Profiler } from "profiling/Profiler";
 import { createScreepsProfilerAdapter } from "profiling/ScreepsProfilerAdapter";
 import { flushRuntimeStats } from "stats/Stats";
 
-describe("logger|observability logger", () => {
+describe("logger|profiler|stats|observability logger", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   afterEach(() => {
