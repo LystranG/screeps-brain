@@ -21,6 +21,25 @@ describe("memory migrations", () => {
     assert.equal(memory.stats.ticks, 0);
   });
 
+  it("initializes Phase 4 colony config defaults in project memory", () => {
+    const memory = {} as Memory;
+
+    const result = runMemoryMigrations(memory);
+    const config = memory.config as typeof memory.config & {
+      colony?: {
+        primaryRoomName: string | null;
+        intelRefreshCadence: number;
+      };
+    };
+
+    assert.isTrue(result.ok);
+    assert.equal(memory.version, 3);
+    assert.deepEqual(config.colony, {
+      primaryRoomName: null,
+      intelRefreshCadence: 50
+    });
+  });
+
   it("upgrades old memory while preserving existing creep entries", () => {
     const memory = {
       version: 0,
