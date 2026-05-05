@@ -209,19 +209,15 @@ describe("command inspection|future|blocked", () => {
     };
   }
 
-  it("defines colony, strategy, and spawn as future/blocked read-only namespaces", () => {
+  it("defines strategy as the remaining future/blocked read-only namespace", () => {
     const namespaces = createFutureNamespaces();
 
     assert.deepEqual(
       namespaces.map(namespace => namespace.name),
-      ["colony", "strategy", "spawn"]
+      ["strategy"]
     );
-    assert.include(renderNamespaceHelp(namespaces[0]), "cmd.colony.status()");
-    assert.include(renderNamespaceHelp(namespaces[1]), "cmd.strategy.status()");
-    assert.include(renderNamespaceHelp(namespaces[2]), "cmd.spawn.status()");
-    assert.include(renderNamespaceHelp(namespaces[0]), "requires colony context phase");
-    assert.include(renderNamespaceHelp(namespaces[1]), "requires strategy planning phase");
-    assert.include(renderNamespaceHelp(namespaces[2]), "requires spawn queue phase");
+    assert.include(renderNamespaceHelp(namespaces[0]), "cmd.strategy.status()");
+    assert.include(renderNamespaceHelp(namespaces[0]), "requires strategy planning phase");
 
     for (const namespace of namespaces) {
       const help = renderNamespaceHelp(namespace);
@@ -243,25 +239,13 @@ describe("command inspection|future|blocked", () => {
       {
         ok: false,
         status: "FUTURE",
-        message: "colony commands require colony context phase; no request queued",
-        effect: CommandEffect.futureBlocked
-      },
-      {
-        ok: false,
-        status: "FUTURE",
         message: "strategy commands require strategy planning phase; no request queued",
-        effect: CommandEffect.futureBlocked
-      },
-      {
-        ok: false,
-        status: "FUTURE",
-        message: "spawn commands require spawn queue phase; no request queued",
         effect: CommandEffect.futureBlocked
       }
     ]);
     assert.deepEqual(memory.commands.queue, []);
     assert.deepEqual(memory.commands.history, []);
-    assert.equal(formatCommandResult(results[2]), "FUTURE spawn commands require spawn queue phase; no request queued");
+    assert.equal(formatCommandResult(results[0]), "FUTURE strategy commands require strategy planning phase; no request queued");
   });
 });
 

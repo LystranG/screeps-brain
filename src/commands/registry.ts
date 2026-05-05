@@ -1,5 +1,6 @@
 import { CommandContext, CommandNamespaceDefinition, CommandRegistry, CommandResult } from "commands/types";
 import { CommandEffect } from "constants/commands";
+import { createColonyNamespace } from "commands/namespaces/colony";
 import { createConfigNamespace } from "commands/namespaces/config";
 import { createDebugNamespace } from "commands/namespaces/debug";
 import { createEnvNamespace } from "commands/namespaces/env";
@@ -64,6 +65,7 @@ export function createDefaultCommandRegistry(): CommandRegistry {
     createSimNamespace(),
     createConfigNamespace(),
     createDebugNamespace(),
+    createColonyNamespace(),
     ...createFutureNamespaces()
   ]);
 }
