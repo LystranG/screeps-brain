@@ -1,5 +1,11 @@
 import { assert } from "chai";
 import { CommandEffect } from "constants/commands";
+import {
+  validateBooleanArgument,
+  validateConfirmToken,
+  validateDumpPath,
+  validateSamplingRate
+} from "commands/arguments";
 import { formatCommandResult, renderNamespaceHelp, renderRootHelp } from "commands/formatter";
 import { CommandNamespaceDefinition } from "commands/types";
 
@@ -107,5 +113,37 @@ describe("command core|formatter|help", () => {
     assert.include(help, "cmd.config.deepProfiler(enabled, token)");
     assert.include(help, "writes-memory");
     assert.include(help, "requires-confirm");
+  });
+});
+
+describe("command core|arguments", () => {
+  it("validates the exact confirmation token", () => {
+    assert.deepEqual(validateConfirmToken(undefined), {
+      ok: false,
+      reason: "Confirmation token must be CONFIRM"
+    });
+    assert.deepEqual(validateConfirmToken("CONFIRM"), { ok: true, value: "CONFIRM" });
+  });
+
+  it("strictly whitelists debug dump paths", () => {
+    assert.deepEqual(validateDumpPath("Memory.config"), { ok: true, value: "Memory.config" });
+    assert.isFalse(validateDumpPath("screeps.json").ok);
+  });
+
+  it("accepts only finite integer sampling rates in range", () => {
+    assert.deepEqual(validateSamplingRate(10), { ok: true, value: 10 });
+    assert.isFalse(validateSamplingRate(0).ok);
+    assert.isFalse(validateSamplingRate(Number.NaN).ok);
+    assert.isFalse(validateSamplingRate(Infinity).ok);
+    assert.isFalse(validateSamplingRate("10").ok);
+  });
+
+  it("accepts only booleans and exact boolean strings", () => {
+    assert.deepEqual(validateBooleanArgument(true), { ok: true, value: true });
+    assert.deepEqual(validateBooleanArgument(false), { ok: true, value: false });
+    assert.deepEqual(validateBooleanArgument("true"), { ok: true, value: true });
+    assert.deepEqual(validateBooleanArgument("false"), { ok: true, value: false });
+    assert.isFalse(validateBooleanArgument(" TRUE ").ok);
+    assert.isFalse(validateBooleanArgument(1).ok);
   });
 });
