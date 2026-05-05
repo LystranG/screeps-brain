@@ -96,6 +96,14 @@ describe("command install|global cmd", () => {
     __cmdApiVersion?: number;
   }
 
+  function installedCmd(): NonNullable<TestCommandGlobalState["cmd"]> {
+    const currentCmd = (global as unknown as TestCommandGlobalState).cmd;
+
+    assert.exists(currentCmd);
+
+    return currentCmd as NonNullable<TestCommandGlobalState["cmd"]>;
+  }
+
   let consoleLog: sinon.SinonStub | null = null;
 
   beforeEach(() => {
@@ -122,19 +130,18 @@ describe("command install|global cmd", () => {
 
   it("installs string-returning public command methods", () => {
     installConsoleCommands();
-    const cmd = (global as unknown as TestCommandGlobalState).cmd;
+    const cmd = installedCmd();
 
-    assert.exists(cmd);
-    assert.isString(cmd?.help());
-    assert.isString(cmd?.env.status());
-    assert.isString(cmd?.sim.guidance());
-    assert.isString(cmd?.config.logLevel("debug"));
-    assert.isString(cmd?.debug.dump("Memory.config", 200));
-    assert.include(cmd?.help() ?? "", "cmd.env.help()");
-    assert.include(cmd?.env.status() ?? "", "OK env status:");
-    assert.include(cmd?.config.logLevel("debug") ?? "", "OK logLevel: debug -> debug");
-    assert.include(cmd?.debug.dump("Memory.config", 200) ?? "", "OK debug dump Memory.config:");
-    assert.include(cmd?.spawn.status() ?? "", "FUTURE spawn commands require spawn queue phase");
+    assert.isString(cmd.help());
+    assert.isString(cmd.env.status());
+    assert.isString(cmd.sim.guidance());
+    assert.isString(cmd.config.logLevel("debug"));
+    assert.isString(cmd.debug.dump("Memory.config", 200));
+    assert.include(cmd.help(), "cmd.env.help()");
+    assert.include(cmd.env.status(), "OK env status:");
+    assert.include(cmd.config.logLevel("debug"), "OK logLevel: debug -> debug");
+    assert.include(cmd.debug.dump("Memory.config", 200), "OK debug dump Memory.config:");
+    assert.include(cmd.spawn.status(), "FUTURE spawn commands require spawn queue phase");
   });
 
   it("reuses same-version cmd and rebuilds stale version bindings", () => {
@@ -156,11 +163,11 @@ describe("command install|global cmd", () => {
     consoleLog = sinon.stub(console, "log");
 
     installConsoleCommands();
-    const cmd = (global as unknown as TestCommandGlobalState).cmd;
+    const cmd = installedCmd();
 
-    cmd?.env.status();
-    cmd?.config.logLevel("debug");
-    cmd?.debug.dump("Memory.config", 200);
+    cmd.env.status();
+    cmd.config.logLevel("debug");
+    cmd.debug.dump("Memory.config", 200);
 
     assert.isFalse(consoleLog.called);
   });
