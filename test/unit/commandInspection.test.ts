@@ -546,6 +546,7 @@ describe("command inspection|spawn", () => {
     const rejectedRoom = dryRun.run([""], createContext(memory, game));
     const rejectedRole = dryRun.run(["W1N1", "miner"], createContext(memory, game));
     const rejectedEnergy = dryRun.run(["W1N1", "worker", -1], createContext(memory, game));
+    const defaultDryRun = dryRun.run([], createContext(memory, game));
     const explicitDryRun = dryRun.run(["W1N1", "builder", 250], createContext(memory, game));
     const primarySpawn = game.spawns.SpawnPrimary as InspectableSpawn;
 
@@ -555,6 +556,7 @@ describe("command inspection|spawn", () => {
     assert.include(rejectedRole.message, "role must be one of");
     assert.equal(rejectedEnergy.status, "ERR");
     assert.include(rejectedEnergy.message, "energy must be a non-negative integer");
+    assert.include(defaultDryRun.message, "spawn dryRun W1N1 worker:");
     assert.include(explicitDryRun.message, "spawn dryRun W1N1 builder:");
     assert.deepEqual(primarySpawn.calls[0].options, {
       memory: { role: "worker" },

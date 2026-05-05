@@ -51,7 +51,7 @@ function createConsoleCommandTree(registry: CommandRegistry): ConsoleCommandTree
     debug: createNamespaceCommandTree(registry, "debug", ["stats", "observability", "dump"]),
     colony: createNamespaceCommandTree(registry, "colony", ["status", "list", "detail"]),
     strategy: createNamespaceCommandTree(registry, "strategy", ["status"]),
-    spawn: createNamespaceCommandTree(registry, "spawn", ["status"])
+    spawn: createNamespaceCommandTree(registry, "spawn", ["status", "queue", "dryRun"])
   };
 }
 
