@@ -50,3 +50,33 @@ export function mockGame(): ReturnType<typeof createMockGame> {
 export function mockMemory(): ReturnType<typeof createMockMemory> {
   return (global as unknown as { Memory: ReturnType<typeof createMockMemory> }).Memory;
 }
+
+export interface MockRoomOptions {
+  name: string;
+  controller?: any;
+  spawns?: any[];
+  sources?: any[];
+  creeps?: any[];
+  constructionSites?: any[];
+  hostiles?: any[];
+  energyAvailable?: number;
+  energyCapacityAvailable?: number;
+}
+
+export function createMockRoom(options: MockRoomOptions): any {
+  const findResults: { [findType: number]: any[] } = {
+    [FIND_MY_SPAWNS]: options.spawns ?? [],
+    [FIND_SOURCES]: options.sources ?? [],
+    [FIND_MY_CREEPS]: options.creeps ?? [],
+    [FIND_MY_CONSTRUCTION_SITES]: options.constructionSites ?? [],
+    [FIND_HOSTILE_CREEPS]: options.hostiles ?? []
+  };
+
+  return {
+    name: options.name,
+    controller: options.controller,
+    energyAvailable: options.energyAvailable ?? 0,
+    energyCapacityAvailable: options.energyCapacityAvailable ?? 0,
+    find: (findType: number): any[] => findResults[findType] ?? []
+  };
+}
