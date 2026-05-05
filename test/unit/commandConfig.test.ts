@@ -1,5 +1,7 @@
 import { assert } from "chai";
+import { renderNamespaceHelp } from "commands/formatter";
 import { createConfigNamespace } from "commands/namespaces/config";
+import { createCommandRegistry } from "commands/registry";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame } from "./mock";
 
@@ -154,5 +156,68 @@ describe("command config|confirm|policy", () => {
     );
     assert.equal(memory.config.strategy.allowExpansion, true);
     assert.equal(memory.config.strategy.allowRemoteMining, true);
+  });
+});
+
+describe("command config|help|history", () => {
+  function createCommandMemory(): Memory {
+    return {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+  }
+
+  function createContext(memory: Memory) {
+    return {
+      game: createMockGame() as unknown as Game,
+      memory
+    };
+  }
+
+  it("renders config namespace help with every signature and side effect", () => {
+    const help = renderNamespaceHelp(createConfigNamespace());
+
+    assert.include(help, "cmd.config.logLevel(level) [writes-memory]");
+    assert.include(help, "cmd.config.profiler(enabled) [writes-memory]");
+    assert.include(help, "cmd.config.namespaceSampling(namespace, rate) [writes-memory]");
+    assert.include(help, "Set Memory.config.observability.namespaceSampling[namespace] to rate.");
+    assert.include(help, "cmd.config.namespaceEnabled(namespace, enabled) [writes-memory]");
+    assert.include(help, "Set Memory.config.observability.enabledNamespaces[namespace].enabled.");
+    assert.include(help, "cmd.config.construction(enabled) [writes-memory]");
+    assert.include(help, "cmd.config.defense(enabled) [writes-memory]");
+    assert.include(help, "cmd.config.deepProfiler(enabled, confirm?) [requires-confirm]");
+    assert.include(help, "cmd.config.allowExpansion(enabled, confirm?) [requires-confirm]");
+    assert.include(help, "cmd.config.allowRemoteMining(enabled, confirm?) [requires-confirm]");
+  });
+
+  it("records compact history for successful writes and confirmation-required attempts", () => {
+    const memory = createCommandMemory();
+    const registry = createCommandRegistry([createConfigNamespace()]);
+    const context = createContext(memory);
+
+    assert.equal(registry.execute(["config", "logLevel"], ["debug"], context).status, "OK");
+    assert.equal(registry.execute(["config", "deepProfiler"], [true], context).status, "CONFIRM");
+    assert.equal(registry.execute(["config", "allowExpansion"], [true, "CONFIRM"], context).status, "OK");
+
+    assert.deepEqual(memory.commands.history, [
+      {
+        tick: 12345,
+        path: "config.logLevel",
+        args: ["debug"],
+        status: "OK"
+      },
+      {
+        tick: 12345,
+        path: "config.deepProfiler",
+        args: ["true"],
+        status: "CONFIRM"
+      },
+      {
+        tick: 12345,
+        path: "config.allowExpansion",
+        args: ["true", "CONFIRM"],
+        status: "OK"
+      }
+    ]);
   });
 });
