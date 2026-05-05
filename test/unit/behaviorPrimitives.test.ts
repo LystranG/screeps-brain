@@ -1,5 +1,9 @@
 import { assert } from "chai";
+import { ColonyContext } from "colony/types";
+import { RoleName } from "constants/roles";
 import { TaskMemory } from "memory/schema";
+import { RuntimeServices } from "runtime/services";
+import { createDefaultRoleRegistry } from "roles/registry";
 import { clearTaskMemory, createTaskMemory, TaskStatus, TaskType, validateTaskMemory } from "tasks/model";
 
 describe("behavior primitives task model", () => {
@@ -58,3 +62,75 @@ describe("behavior primitives task model", () => {
     });
   });
 });
+
+describe("behavior primitives role registry", () => {
+  it("registers default skeleton roles with blocked phase status", () => {
+    const registry = createDefaultRoleRegistry();
+
+    assert.deepEqual(
+      registry.list().map((role: { name: string }) => role.name),
+      [RoleName.worker, RoleName.harvester, RoleName.upgrader, RoleName.builder]
+    );
+
+    const result = registry.run(RoleName.worker, createNoopCreep(RoleName.worker), createRoleContext());
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "blocked",
+      reason: "role behavior deferred to Phase 6"
+    });
+  });
+
+  it("returns an unknown role result instead of dispatching unregistered memory", () => {
+    const registry = createDefaultRoleRegistry();
+    const result = registry.run("miner", createNoopCreep("miner"), createRoleContext());
+
+    assert.deepEqual(result, {
+      ok: false,
+      status: "blocked",
+      reason: "unknown role: miner"
+    });
+  });
+
+  it("keeps default role runners side-effect free", () => {
+    const registry = createDefaultRoleRegistry();
+    const creep = {
+      memory: {
+        role: RoleName.harvester
+      },
+      harvest: () => assert.fail("harvest should not be called"),
+      upgradeController: () => assert.fail("upgradeController should not be called"),
+      build: () => assert.fail("build should not be called"),
+      moveTo: () => assert.fail("moveTo should not be called")
+    } as unknown as Creep;
+
+    const result = registry.run(RoleName.harvester, creep, createRoleContext());
+
+    assert.equal(result.status, "blocked");
+  });
+});
+
+function createRoleContext(): { colony: ColonyContext; services: RuntimeServices; game: Game; tick: number } {
+  return {
+    colony: {
+      roomName: "W1N1",
+      primary: true,
+      creeps: [],
+      spawns: [],
+      sources: []
+    } as unknown as ColonyContext,
+    services: {} as RuntimeServices,
+    game: {
+      time: 200
+    } as Game,
+    tick: 200
+  };
+}
+
+function createNoopCreep(role: string): Creep {
+  return {
+    memory: {
+      role
+    }
+  } as unknown as Creep;
+}
