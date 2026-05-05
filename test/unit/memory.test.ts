@@ -56,14 +56,14 @@ describe("memory migrations", () => {
 
     assert.isTrue(result.ok);
     assert.equal(memory.version, CURRENT_MEMORY_VERSION);
-    assert.deepEqual(memory.creeps.worker1, {
+    assert.deepEqual(memory.creeps.worker1 as unknown, {
       role: "worker",
       room: "W1N1",
       working: false
     });
   });
 
-  it("upgrades v1 memory to v2 observability, environment, and sim defaults", () => {
+  it("upgrades v1 memory through observability, environment, sim, and colony defaults", () => {
     const memory = {
       version: 1,
       runtime: {
@@ -116,10 +116,10 @@ describe("memory migrations", () => {
 
     const result = runMemoryMigrations(memory);
 
-    assert.deepEqual(result, { ok: true, version: 2 });
-    assert.equal((memory as Memory).version, 2, "Memory.version should equal 2 after migration");
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal((memory as Memory).version, CURRENT_MEMORY_VERSION);
     assert.isTrue(memory.config.automation.enabled);
-    assert.deepEqual(memory.creeps.worker1, {
+    assert.deepEqual(memory.creeps.worker1 as unknown, {
       role: "worker",
       room: "W1N1",
       working: false
@@ -137,6 +137,10 @@ describe("memory migrations", () => {
     assert.deepEqual(memory.stats.cpu, {
       available: true,
       stages: {}
+    });
+    assert.deepEqual(memory.config.colony, {
+      primaryRoomName: null,
+      intelRefreshCadence: 50
     });
   });
 

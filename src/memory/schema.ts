@@ -1,4 +1,6 @@
-export const CURRENT_MEMORY_VERSION = 2;
+import { RoleName } from "constants/roles";
+
+export const CURRENT_MEMORY_VERSION = 3;
 
 export interface LogNamespaceConfigMemory {
   enabled?: boolean;
@@ -58,6 +60,71 @@ export interface RuntimeMemory {
   sim: SimBootstrapMemory;
 }
 
+export interface ColonyConfigMemory {
+  primaryRoomName: string | null;
+  intelRefreshCadence: number;
+}
+
+export type ColonyStatusMemory = "ready" | "degraded" | "error";
+
+export interface ColonyIntelMemory {
+  roomName: string;
+  lastSeenTick: number;
+  lastRefreshTick: number;
+  status: ColonyStatusMemory;
+  missingReasons: string[];
+  controllerId: string | null;
+  rcl: number | null;
+  sourceIds: string[];
+  spawnIds: string[];
+  primary: boolean;
+  stage: string;
+}
+
+export interface TaskMemory {
+  type: string;
+  targetId: string | null;
+  status: "queued" | "assigned" | "running" | "succeeded" | "failed" | "blocked";
+  assignedTick: number | null;
+  updatedTick: number;
+  result: string | null;
+  failure: string | null;
+}
+
+export interface SpawnRequestMemory {
+  id: string;
+  roomName: string;
+  role: RoleName;
+  priority: number;
+  body: BodyPartConstant[];
+  memory: CreepMemory;
+  reason: string;
+  requestedTick: number;
+  status: "queued" | "validating" | "blocked" | "spawning" | "spawned" | "failed";
+  attempts: number;
+  lastError: string | null;
+}
+
+export interface ColonyMemory {
+  roomName: string;
+  primary: boolean;
+  status: ColonyStatusMemory;
+  intel: ColonyIntelMemory;
+  spawnQueue: SpawnRequestMemory[];
+}
+
+export interface ProcessMemory {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  cadence: number;
+  nextRunTick: number;
+  lastRunTick: number | null;
+  lastResult: string | null;
+  lastError: string | null;
+}
+
 export interface ProjectConfigMemory {
   automation: {
     enabled: boolean;
@@ -81,15 +148,16 @@ export interface ProjectConfigMemory {
     safeMode: "manual";
     allowRamparts: boolean;
   };
+  colony: ColonyConfigMemory;
   observability: ObservabilityConfigMemory;
 }
 
 export interface ColoniesMemory {
-  [roomName: string]: Record<string, unknown>;
+  [roomName: string]: ColonyMemory;
 }
 
 export interface ProcessesMemory {
-  [processId: string]: Record<string, unknown>;
+  [processId: string]: ProcessMemory;
 }
 
 export interface CommandsMemory {
@@ -165,6 +233,10 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
         safeMode: "manual",
         allowRamparts: false
       },
+      colony: {
+        primaryRoomName: null,
+        intelRefreshCadence: 50
+      },
       observability: {
         logLevel: "info",
         enabledNamespaces: {},
@@ -203,5 +275,10 @@ declare global {
     processes: ProcessesMemory;
     commands: CommandsMemory;
     stats: StatsMemory;
+  }
+
+  interface CreepMemory {
+    role?: RoleName;
+    task?: TaskMemory;
   }
 }

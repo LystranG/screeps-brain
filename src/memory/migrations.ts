@@ -16,7 +16,8 @@ type LegacyStatsMemory = Partial<Omit<StatsMemory, "cpu">> & { cpu?: Record<stri
 
 const orderedMigrations: {[version: number]: MigrationStep} = {
   1: migrateToVersion1,
-  2: migrateToVersion2
+  2: migrateToVersion2,
+  3: migrateToVersion3
 };
 
 /**
@@ -112,11 +113,11 @@ function migrateToVersion2(memory: Memory): void {
   const legacyStageStats = extractLegacyCpuStages(legacyCpu);
 
   // v2 只补齐观测、环境、sim 和结构化 CPU stats；已有用户策略值继续保留。
-  memory.version = CURRENT_MEMORY_VERSION;
+  memory.version = 2;
   memory.runtime = {
     ...defaults.runtime,
     ...memory.runtime,
-    lastMigration: CURRENT_MEMORY_VERSION,
+    lastMigration: 2,
     migrationError: null,
     environment: {
       ...defaults.runtime.environment,
@@ -149,6 +150,10 @@ function migrateToVersion2(memory: Memory): void {
       ...defaults.config.defense,
       ...memory.config?.defense
     },
+    colony: {
+      ...defaults.config.colony,
+      ...memory.config?.colony
+    },
     observability: {
       ...defaults.config.observability,
       ...memory.config?.observability,
@@ -171,6 +176,71 @@ function migrateToVersion2(memory: Memory): void {
         ...defaults.stats.cpu.stages,
         ...legacyStageStats,
         ...existingStages
+      }
+    }
+  };
+  memory.colonies = memory.colonies || defaults.colonies;
+  memory.processes = memory.processes || defaults.processes;
+  memory.commands = {
+    queue: memory.commands?.queue || defaults.commands.queue,
+    history: memory.commands?.history || defaults.commands.history
+  };
+  memory.creeps = memory.creeps || {};
+}
+
+function migrateToVersion3(memory: Memory): void {
+  const defaults = createDefaultProjectMemorySections();
+
+  // v3 只扩展 Phase 4 primitive 的 JSON 默认结构；现有 colony/process/creep 数据必须原样保留。
+  memory.version = CURRENT_MEMORY_VERSION;
+  memory.runtime = {
+    ...defaults.runtime,
+    ...memory.runtime,
+    lastMigration: CURRENT_MEMORY_VERSION,
+    migrationError: null
+  };
+  memory.config = {
+    automation: {
+      ...defaults.config.automation,
+      ...memory.config?.automation
+    },
+    strategy: {
+      ...defaults.config.strategy,
+      ...memory.config?.strategy
+    },
+    construction: {
+      ...defaults.config.construction,
+      ...memory.config?.construction
+    },
+    defense: {
+      ...defaults.config.defense,
+      ...memory.config?.defense
+    },
+    colony: {
+      ...defaults.config.colony,
+      ...memory.config?.colony
+    },
+    observability: {
+      ...defaults.config.observability,
+      ...memory.config?.observability,
+      profiler: {
+        ...defaults.config.observability.profiler,
+        ...memory.config?.observability?.profiler
+      },
+      deepProfiler: {
+        ...defaults.config.observability.deepProfiler,
+        ...memory.config?.observability?.deepProfiler
+      }
+    }
+  };
+  memory.stats = {
+    ticks: typeof memory.stats?.ticks === "number" ? memory.stats.ticks : defaults.stats.ticks,
+    cpu: {
+      ...defaults.stats.cpu,
+      ...memory.stats?.cpu,
+      stages: {
+        ...defaults.stats.cpu.stages,
+        ...memory.stats?.cpu?.stages
       }
     }
   };
