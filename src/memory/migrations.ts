@@ -197,7 +197,20 @@ function migrateToVersion3(memory: Memory): void {
     ...defaults.runtime,
     ...memory.runtime,
     lastMigration: CURRENT_MEMORY_VERSION,
-    migrationError: null
+    migrationError: null,
+    environment: {
+      ...defaults.runtime.environment,
+      ...memory.runtime?.environment
+    },
+    sim: {
+      ...defaults.runtime.sim,
+      ...memory.runtime?.sim,
+      bootstrap: {
+        ...defaults.runtime.sim.bootstrap,
+        ...memory.runtime?.sim?.bootstrap
+      },
+      guidance: memory.runtime?.sim?.guidance || defaults.runtime.sim.guidance
+    }
   };
   memory.config = {
     automation: {

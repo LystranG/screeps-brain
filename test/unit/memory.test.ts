@@ -262,6 +262,130 @@ describe("memory migrations", () => {
     });
   });
 
+  it("upgrades v2 memory to v3 while preserving colony and process entries", () => {
+    const colonyMemory = {
+      roomName: "W1N1",
+      primary: true,
+      status: "ready",
+      intel: {
+        roomName: "W1N1",
+        lastSeenTick: 20,
+        lastRefreshTick: 20,
+        status: "ready",
+        missingReasons: [],
+        controllerId: "controller1",
+        rcl: 2,
+        sourceIds: ["source1"],
+        spawnIds: ["spawn1"],
+        primary: true,
+        stage: "rcl2"
+      },
+      spawnQueue: [
+        {
+          id: "spawn-request-1",
+          roomName: "W1N1",
+          role: "worker",
+          priority: 10,
+          body: ["work", "carry", "move"],
+          memory: {
+            role: "worker"
+          },
+          reason: "bootstrap",
+          requestedTick: 20,
+          status: "queued",
+          attempts: 0,
+          lastError: null
+        }
+      ]
+    };
+    const processMemory = {
+      id: "process-1",
+      name: "colonyIntel",
+      enabled: true,
+      priority: 5,
+      cadence: 50,
+      nextRunTick: 25,
+      lastRunTick: 20,
+      lastResult: "ok",
+      lastError: null
+    };
+    const memory = {
+      version: 2,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: 2,
+        migrationError: null,
+        environment: {
+          type: "sim",
+          shard: "sim",
+          lastChangedTick: 1,
+          lastSeenTick: 20
+        },
+        sim: {
+          bootstrap: {
+            version: 1,
+            completed: true,
+            ready: true,
+            lastRunTick: 20
+          },
+          guidance: {}
+        }
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W1N1"
+        }
+      },
+      colonies: {
+        W1N1: colonyMemory
+      },
+      processes: {
+        "process-1": processMemory
+      },
+      commands: {
+        queue: [{ command: "status" }],
+        history: [{ command: "help" }]
+      },
+      stats: {
+        ticks: 20,
+        cpu: {
+          available: true,
+          stages: {
+            kernel: {
+              last: 1,
+              average: 1,
+              max: 1,
+              samples: 1
+            }
+          }
+        }
+      },
+      creeps: {
+        worker1: {
+          role: "worker"
+        }
+      }
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
+    assert.deepEqual(memory.config.colony, {
+      primaryRoomName: "W1N1",
+      intelRefreshCadence: 50
+    });
+    assert.deepEqual(memory.colonies.W1N1 as unknown, colonyMemory);
+    assert.deepEqual(memory.processes["process-1"] as unknown, processMemory);
+    assert.deepEqual(memory.commands.queue, [{ command: "status" }]);
+    assert.deepEqual(memory.commands.history, [{ command: "help" }]);
+    assert.deepEqual(memory.creeps.worker1, { role: "worker" });
+  });
+
   it("preserves legacy CPU stage summaries when migrating to v2", () => {
     const legacyHarvest = {
       last: 2,
