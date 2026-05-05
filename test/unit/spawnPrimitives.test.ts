@@ -9,6 +9,7 @@ import {
   markSpawnRequestValidated,
   selectNextSpawnRequest
 } from "spawning/queue";
+import { runSpawnValidation } from "spawning/runner";
 
 before(() => {
   const globals = global as unknown as { [name: string]: unknown };
@@ -20,6 +21,8 @@ before(() => {
     carry: 50,
     move: 50
   };
+  globals.OK = 0;
+  globals.ERR_NOT_ENOUGH_ENERGY = -6;
 });
 
 describe("spawn primitives body builder", () => {
@@ -60,6 +63,94 @@ describe("spawn primitives body builder", () => {
     assert.deepEqual(result.body, ["work", "carry", "move"]);
     assert.equal(result.cost, 200);
     assert.equal(result.fallbackReason, "harvest template cost exceeds energy budget");
+  });
+});
+
+describe("spawn primitives dry-run runner", () => {
+  it("skips when there is no queued request or no idle spawn", () => {
+    const memory = createMemoryWithDefaults();
+    const noRequest = runSpawnValidation([createContext("W1N1", true, [createSpawn("Spawn1")])], memory, {}, 20);
+
+    assert.isFalse(noRequest.ok);
+    assert.equal(noRequest.status, "skipped");
+    assert.equal(noRequest.reason, "no queued spawn request");
+
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-3",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "busy spawn validation",
+        requestedTick: 20
+      })
+    );
+
+    const noIdleSpawn = runSpawnValidation([createContext("W1N1", true, [createSpawn("Spawn1", true)])], memory, {}, 21);
+
+    assert.isFalse(noIdleSpawn.ok);
+    assert.equal(noIdleSpawn.status, "skipped");
+    assert.equal(noIdleSpawn.reason, "no idle spawn in colony");
+  });
+
+  it("dry-runs spawnCreep and marks requests validated on OK", () => {
+    const memory = createMemoryWithDefaults();
+    const spawn = createSpawn("Spawn1");
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-4",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "dry-run success",
+        requestedTick: 20
+      })
+    );
+
+    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {}, 22);
+
+    assert.isTrue(result.ok);
+    assert.equal(result.status, "validated");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
+    assert.deepEqual(spawn.calls[0].body, ["work", "carry", "move"]);
+    assert.deepEqual(spawn.calls[0].options, {
+      memory: { role: "worker" },
+      dryRun: true
+    });
+    assert.include(spawn.calls[0].name, "worker-W1N1-22");
+  });
+
+  it("records numeric return code string when dry-run spawnCreep fails", () => {
+    const memory = createMemoryWithDefaults();
+    const spawn = createSpawn("Spawn1", false, ERR_NOT_ENOUGH_ENERGY);
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-5",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "dry-run failure",
+        requestedTick: 20
+      })
+    );
+
+    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {}, 23);
+
+    assert.isFalse(result.ok);
+    assert.equal(result.status, "error");
+    assert.equal(result.reason, "-6");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 1);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-6");
+    assert.isTrue(spawn.calls[0].options.dryRun);
   });
 });
 
@@ -183,7 +274,7 @@ function createMemoryWithDefaults(): Memory {
   };
 }
 
-function createContext(roomName: string, primary: boolean): ColonyContext {
+function createContext(roomName: string, primary: boolean, spawns: StructureSpawn[] = []): ColonyContext {
   return {
     roomName,
     primary,
@@ -191,7 +282,7 @@ function createContext(roomName: string, primary: boolean): ColonyContext {
     missingReasons: [],
     room: { name: roomName } as Room,
     controller: null,
-    spawns: [],
+    spawns,
     sources: [],
     creeps: [],
     constructionSites: [],
@@ -215,7 +306,7 @@ function createContext(roomName: string, primary: boolean): ColonyContext {
     },
     intel: {
       roomName,
-      spawns: [],
+      spawns,
       sources: [],
       creeps: [],
       constructionSites: [],
@@ -229,4 +320,33 @@ function createContext(roomName: string, primary: boolean): ColonyContext {
       scannedTick: 1
     }
   };
+}
+
+interface MockSpawnCall {
+  body: BodyPartConstant[];
+  name: string;
+  options: SpawnOptions;
+}
+
+interface MockSpawn extends StructureSpawn {
+  calls: MockSpawnCall[];
+}
+
+function createSpawn(name: string, busy = false, returnCode: ScreepsReturnCode = OK): MockSpawn {
+  const calls: MockSpawnCall[] = [];
+
+  return {
+    name,
+    spawning: busy ? {} : null,
+    calls,
+    spawnCreep: (body: BodyPartConstant[], creepName: string, options: SpawnOptions): ScreepsReturnCode => {
+      calls.push({
+        body,
+        name: creepName,
+        options
+      });
+
+      return returnCode;
+    }
+  } as MockSpawn;
 }
