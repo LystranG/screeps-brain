@@ -7,6 +7,7 @@ import { createEnvNamespace } from "commands/namespaces/env";
 import { createFutureNamespaces } from "commands/namespaces/future";
 import { createColonyNamespace } from "commands/namespaces/colony";
 import { createSimNamespace } from "commands/namespaces/sim";
+import { createSpawnNamespace } from "commands/namespaces/spawn";
 import { createDefaultCommandRegistry } from "commands/registry";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame, createMockRoom } from "./mock";
@@ -376,3 +377,230 @@ describe("command inspection|colony", () => {
     assert.include(renderNamespaceHelp(registry.getNamespace("colony")!), "cmd.colony.list()");
   });
 });
+
+describe("command inspection|spawn", () => {
+  function createInspectionMemory(): Memory {
+    const memory = {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+
+    memory.config.colony.primaryRoomName = "W1N1";
+    memory.colonies.W1N1 = {
+      roomName: "W1N1",
+      primary: true,
+      status: "ready",
+      intel: {
+        roomName: "W1N1",
+        lastSeenTick: 100,
+        lastRefreshTick: 100,
+        status: "ready",
+        missingReasons: [],
+        controllerId: "controller-primary",
+        rcl: 2,
+        sourceIds: ["source-a"],
+        spawnIds: ["spawn-primary"],
+        primary: true,
+        stage: "rcl2"
+      },
+      spawnQueue: [
+        {
+          id: "spawn-worker-1",
+          roomName: "W1N1",
+          role: "worker",
+          priority: 2,
+          body: ["work", "carry", "move"],
+          memory: { role: "worker" } as CreepMemory,
+          reason: "bootstrap worker coverage",
+          requestedTick: 99,
+          status: "queued",
+          attempts: 1,
+          lastError: "-6"
+        }
+      ]
+    };
+    memory.colonies.W2N2 = {
+      roomName: "W2N2",
+      primary: false,
+      status: "degraded",
+      intel: {
+        roomName: "W2N2",
+        lastSeenTick: 100,
+        lastRefreshTick: 100,
+        status: "degraded",
+        missingReasons: ["missing spawn"],
+        controllerId: "controller-remote",
+        rcl: 1,
+        sourceIds: ["source-b"],
+        spawnIds: [],
+        primary: false,
+        stage: "rcl1"
+      },
+      spawnQueue: [
+        {
+          id: "spawn-builder-1",
+          roomName: "W2N2",
+          role: "builder",
+          priority: 5,
+          body: ["work", "carry", "move"],
+          memory: { role: "builder" } as CreepMemory,
+          reason: "remote construction coverage",
+          requestedTick: 101,
+          status: "blocked",
+          attempts: 0,
+          lastError: "missing spawn"
+        }
+      ]
+    };
+
+    return memory;
+  }
+
+  function createContext(memory: Memory, game: ReturnType<typeof createMockGame>): CommandContext {
+    return {
+      game: game as unknown as Game,
+      memory
+    };
+  }
+
+  function createSpawnGame(): ReturnType<typeof createMockGame> {
+    const game = createMockGame();
+    const primarySpawn = createInspectableSpawn("SpawnPrimary");
+    const busySpawn = createInspectableSpawn("SpawnBusy", true);
+
+    game.rooms = {
+      W1N1: createMockRoom({
+        name: "W1N1",
+        controller: { id: "controller-primary", my: true, level: 2 },
+        spawns: [primarySpawn, busySpawn],
+        sources: [{ id: "source-a" }],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [],
+        energyAvailable: 300,
+        energyCapacityAvailable: 550
+      }),
+      W2N2: createMockRoom({
+        name: "W2N2",
+        controller: { id: "controller-remote", my: true, level: 1 },
+        spawns: [],
+        sources: [{ id: "source-b" }],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [],
+        energyAvailable: 200,
+        energyCapacityAvailable: 300
+      })
+    };
+    game.spawns = {
+      SpawnPrimary: primarySpawn,
+      SpawnBusy: busySpawn
+    };
+
+    return game;
+  }
+
+  it("defines active read-only spawn status, queue, and dryRun commands", () => {
+    const memory = createInspectionMemory();
+    const game = createSpawnGame();
+    const beforeMemory = JSON.stringify(memory);
+    const namespace = createSpawnNamespace();
+
+    const help = renderNamespaceHelp(namespace);
+    const status = namespace.commands[0].run([], createContext(memory, game));
+    const queue = namespace.commands[1].run([], createContext(memory, game));
+    const dryRun = namespace.commands[2].run([], createContext(memory, game));
+
+    assert.equal(namespace.effect, CommandEffect.readOnly);
+    assert.deepEqual(
+      namespace.commands.map((command: { name: string }) => command.name),
+      ["status", "queue", "dryRun"]
+    );
+    assert.include(help, "cmd.spawn.status()");
+    assert.include(help, "cmd.spawn.queue()");
+    assert.include(help, "cmd.spawn.dryRun(room?, role?, energy?)");
+    assert.include(status.message, "W1N1:queued=1 blocked=0 validated=0 failed=0");
+    assert.include(status.message, "W2N2:queued=0 blocked=1 validated=0 failed=0");
+    assert.include(status.message, "spawns=idle:1 busy:1");
+    assert.include(queue.message, "id=spawn-worker-1");
+    assert.include(queue.message, "room=W1N1");
+    assert.include(queue.message, "role=worker");
+    assert.include(queue.message, "priority=2");
+    assert.include(queue.message, "status=queued");
+    assert.include(queue.message, "attempts=1");
+    assert.include(queue.message, "reason=bootstrap worker coverage");
+    assert.include(dryRun.message, "spawn dryRun W1N1 worker:");
+    assert.include(dryRun.message, "body=work,carry,move");
+    assert.include(dryRun.message, "cost=200");
+    assert.include(dryRun.message, "returnCode=0");
+    assert.include(dryRun.message, "reason=worker balanced template selected");
+    assert.equal(JSON.stringify(memory), beforeMemory);
+  });
+
+  it("validates spawn dryRun inputs without enqueueing or mutating Memory", () => {
+    const memory = createInspectionMemory();
+    const game = createSpawnGame();
+    const namespace = createSpawnNamespace();
+    const dryRun = namespace.commands[2];
+
+    const rejectedRoom = dryRun.run([""], createContext(memory, game));
+    const rejectedRole = dryRun.run(["W1N1", "miner"], createContext(memory, game));
+    const rejectedEnergy = dryRun.run(["W1N1", "worker", -1], createContext(memory, game));
+    const explicitDryRun = dryRun.run(["W1N1", "builder", 250], createContext(memory, game));
+    const primarySpawn = game.spawns.SpawnPrimary as InspectableSpawn;
+
+    assert.equal(rejectedRoom.status, "ERR");
+    assert.include(rejectedRoom.message, "room must be a non-empty string");
+    assert.equal(rejectedRole.status, "ERR");
+    assert.include(rejectedRole.message, "role must be one of");
+    assert.equal(rejectedEnergy.status, "ERR");
+    assert.include(rejectedEnergy.message, "energy must be a non-negative integer");
+    assert.include(explicitDryRun.message, "spawn dryRun W1N1 builder:");
+    assert.deepEqual(primarySpawn.calls[0].options, {
+      memory: { role: "worker" },
+      dryRun: true
+    });
+    assert.deepEqual(primarySpawn.calls[1].options, {
+      memory: { role: "builder" },
+      dryRun: true
+    });
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+  });
+
+  it("registers spawn as active namespace instead of future placeholder", () => {
+    const registry = createDefaultCommandRegistry();
+    const futureNames = createFutureNamespaces().map(namespace => namespace.name);
+
+    assert.isDefined(registry.getNamespace("spawn"));
+    assert.notInclude(futureNames, "spawn");
+    assert.include(renderNamespaceHelp(registry.getNamespace("spawn")!), "cmd.spawn.dryRun");
+  });
+});
+
+interface InspectableSpawn extends StructureSpawn {
+  calls: Array<{
+    body: BodyPartConstant[];
+    name: string;
+    options: SpawnOptions;
+  }>;
+}
+
+function createInspectableSpawn(name: string, busy = false, returnCode: ScreepsReturnCode = 0): InspectableSpawn {
+  const calls: InspectableSpawn["calls"] = [];
+
+  return {
+    id: `${name}-id`,
+    name,
+    spawning: busy ? {} : null,
+    calls,
+    spawnCreep: (body: BodyPartConstant[], creepName: string, options: SpawnOptions): ScreepsReturnCode => {
+      calls.push({
+        body,
+        name: creepName,
+        options
+      });
+
+      return returnCode;
+    }
+  } as InspectableSpawn;
+}
