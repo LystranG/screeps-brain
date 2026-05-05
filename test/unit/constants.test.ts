@@ -28,6 +28,31 @@ describe("constants|validation", () => {
     assert.equal(StrategyMode.manual, "manual");
     assert.equal(StrategyMode.automatic, "automatic");
   });
+
+  it("exposes Phase 4 role and process primitive constants", () => {
+    const roleNames = RoleName as Readonly<Record<string, string>>;
+    const processNames = ProcessName as Readonly<Record<string, string>>;
+
+    assert.deepEqual(roleNames, {
+      worker: "worker",
+      harvester: "harvester",
+      upgrader: "upgrader",
+      builder: "builder"
+    });
+
+    assert.include(Object.keys(processNames), "kernel");
+    assert.include(Object.keys(processNames), "lifecycle");
+    assert.include(Object.keys(processNames), "migration");
+    assert.include(Object.keys(processNames), "environment");
+    assert.include(Object.keys(processNames), "colony");
+    assert.include(Object.keys(processNames), "spawn");
+    assert.include(Object.keys(processNames), "cleanup");
+    assert.include(Object.keys(processNames), "stats");
+    assert.equal(processNames.colonyIntel, "colonyIntel");
+    assert.equal(processNames.creepRoles, "creepRoles");
+    assert.equal(processNames.spawnValidation, "spawnValidation");
+  });
+
   it("accepts any non-empty room name string in Phase 1", () => {
     assert.isTrue(validateRoomName("not-a-real-room").ok);
     assert.deepEqual(validateRoomName(" W1N1 "), { ok: true, value: "W1N1" });
