@@ -1,6 +1,6 @@
-import { validateBooleanArgument, validateConfirmToken, validateSamplingRate } from "commands/arguments";
 import { CommandContext, CommandDefinition, CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { validateBooleanArgument, validateConfirmToken, validateSamplingRate } from "commands/arguments";
 import { validateLogLevel } from "validation/runtime";
 
 function okResult(message: string, effect: CommandEffect = CommandEffect.writesMemory): CommandResult {
@@ -83,7 +83,7 @@ function createProfilerCommand(): CommandDefinition {
       const previous = context.memory.config.observability.profiler.enabled;
       context.memory.config.observability.profiler.enabled = validation.value;
 
-      return okResult(`profiler: ${previous} -> ${validation.value}`);
+      return okResult(`profiler: ${String(previous)} -> ${String(validation.value)}`);
     }
   };
 }
@@ -140,7 +140,7 @@ function createNamespaceEnabledCommand(): CommandDefinition {
         enabled: validation.value
       };
 
-      return okResult(`namespaceEnabled.${namespace}: ${previous ?? "unset"} -> ${validation.value}`);
+      return okResult(`namespaceEnabled.${namespace}: ${previous === undefined ? "unset" : String(previous)} -> ${String(validation.value)}`);
     }
   };
 }
@@ -166,7 +166,7 @@ function createManualToggleCommand(
       const previous = getValue(context);
       setValue(context, validation.value);
 
-      return okResult(`${name}: ${previous} -> ${validation.value}`);
+      return okResult(`${name}: ${String(previous)} -> ${String(validation.value)}`);
     }
   };
 }
@@ -199,7 +199,7 @@ function createConfirmedToggleCommand(
       const previous = getValue(context);
       setValue(context, validation.value);
 
-      return okResult(`${name}: ${previous} -> ${validation.value}`, CommandEffect.requiresConfirm);
+      return okResult(`${name}: ${String(previous)} -> ${String(validation.value)}`, CommandEffect.requiresConfirm);
     }
   };
 }
