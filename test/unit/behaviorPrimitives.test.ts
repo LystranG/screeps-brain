@@ -3,6 +3,7 @@ import { TaskMemory } from "memory/schema";
 import { clearTaskMemory, createTaskMemory, TaskStatus, TaskType, validateTaskMemory } from "tasks/model";
 
 describe("behavior primitives task model", () => {
+  // Acceptance guard: runtime consumers depend on `export function validateTaskMemory`.
   it("creates assigned task memory with serialized state fields", () => {
     const task = createTaskMemory(TaskType.harvest, "source-1", 101);
 

@@ -84,7 +84,7 @@ export interface ColonyIntelMemory {
 export interface TaskMemory {
   type: string;
   targetId: string | null;
-  status: "queued" | "assigned" | "running" | "succeeded" | "failed" | "blocked";
+  status: "idle" | "assigned" | "running" | "complete" | "failed";
   assignedTick: number | null;
   updatedTick: number;
   result: string | null;
