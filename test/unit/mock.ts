@@ -1,3 +1,22 @@
+const SCREEPS_FIND_CONSTANTS = {
+  FIND_SOURCES: 105,
+  FIND_MY_CREEPS: 102,
+  FIND_HOSTILE_CREEPS: 103,
+  FIND_MY_SPAWNS: 112,
+  FIND_MY_CONSTRUCTION_SITES: 114
+};
+
+const SCREEPS_STRUCTURE_CONSTANTS = {
+  STRUCTURE_SPAWN: "spawn"
+};
+
+for (const [constantName, constantValue] of Object.entries({
+  ...SCREEPS_FIND_CONSTANTS,
+  ...SCREEPS_STRUCTURE_CONSTANTS
+})) {
+  (global as unknown as { [name: string]: unknown })[constantName] = constantValue;
+}
+
 // 每个测试都创建新对象，避免 shallow clone 共享嵌套 Memory/Game 状态。
 export function createMockGame(): {
   creeps: { [name: string]: any };

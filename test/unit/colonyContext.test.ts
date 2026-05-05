@@ -115,6 +115,14 @@ describe("room intel", () => {
     assert.isTrue(shouldPersistIntel(previous, unchanged, 60, 50));
     assert.isTrue(shouldPersistIntel(previous, changed, 20, 50));
 
+    memory.colonies.W1N1 = {
+      roomName: "W1N1",
+      primary: previous.primary,
+      status: previous.status,
+      intel: previous,
+      spawnQueue: []
+    };
+
     assert.isFalse(persistColonyIntel(memory, "W1N1", unchanged, 20));
     assert.isTrue(persistColonyIntel(memory, "W1N1", changed, 20));
     assert.deepEqual(memory.colonies.W1N1.intel.sourceIds, ["source-1", "source-2"]);
