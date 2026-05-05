@@ -3,6 +3,7 @@ import * as sinon from "sinon";
 import { Logger } from "logging/Logger";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { Profiler } from "profiling/Profiler";
+import { createScreepsProfilerAdapter } from "profiling/ScreepsProfilerAdapter";
 import { flushRuntimeStats } from "stats/Stats";
 
 describe("logger|observability logger", () => {
@@ -127,6 +128,26 @@ describe("profiler|stats|kernel observability services", () => {
       max: 0,
       samples: 1
     });
+  });
+});
+
+describe("screeps-profiler|deep profiler|observability adapter", () => {
+  it("returns the same function when deep profiler is disabled", () => {
+    const adapter = createScreepsProfilerAdapter(false);
+    const loop = () => "ok";
+
+    assert.isFalse(adapter.enabled);
+    assert.strictEqual(adapter.wrapLoop(loop), loop);
+  });
+
+  it("does not require live Screeps profiler APIs when disabled", () => {
+    const adapter = createScreepsProfilerAdapter(false);
+
+    adapter.registerClass(Logger, "Logger");
+    adapter.registerObject({ label: "value" }, "object");
+    adapter.registerFN(() => "ok");
+
+    assert.isFalse(adapter.enabled);
   });
 });
 
