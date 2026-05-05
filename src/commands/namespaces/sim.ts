@@ -1,5 +1,5 @@
-import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 
 export function createSimNamespace(): CommandNamespaceDefinition {
   return {
@@ -19,8 +19,8 @@ export function createSimNamespace(): CommandNamespaceDefinition {
             ok: true,
             status: "OK",
             message:
-              `sim status: version=${bootstrap.version} completed=${bootstrap.completed} ` +
-              `ready=${bootstrap.ready} lastRunTick=${bootstrap.lastRunTick}`,
+              `sim status: version=${bootstrap.version} completed=${String(bootstrap.completed)} ` +
+              `ready=${String(bootstrap.ready)} lastRunTick=${bootstrap.lastRunTick}`,
             effect: CommandEffect.readOnly
           };
         }

@@ -1,5 +1,5 @@
-import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { detectRuntimeEnvironment } from "environment/detection";
 
 export function createEnvNamespace(): CommandNamespaceDefinition {
@@ -22,7 +22,7 @@ export function createEnvNamespace(): CommandNamespaceDefinition {
             `visibleRooms=${metadata.visibleRoomCount}`,
             `ownedRooms=${metadata.ownedRoomCount}`,
             `spawns=${metadata.spawnCount}`,
-            `cpuAvailable=${metadata.cpuAvailable}`,
+            `cpuAvailable=${String(metadata.cpuAvailable)}`,
             `reason=${metadata.reason}`
           ];
 

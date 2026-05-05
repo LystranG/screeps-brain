@@ -1,5 +1,5 @@
-import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 
 interface FutureNamespaceSpec {
   name: CommandPath;

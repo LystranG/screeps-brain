@@ -1,6 +1,6 @@
-import { validateDumpPath } from "commands/arguments";
-import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
+import { validateDumpPath } from "commands/arguments";
 
 export function createDebugNamespace(): CommandNamespaceDefinition {
   return {
@@ -27,7 +27,7 @@ export function createDebugNamespace(): CommandNamespaceDefinition {
           return {
             ok: true,
             status: "OK",
-            message: `debug stats: ticks=${stats.ticks} cpuAvailable=${stats.cpu.available} stages=${stages}`,
+            message: `debug stats: ticks=${stats.ticks} cpuAvailable=${String(stats.cpu.available)} stages=${stages}`,
             effect: CommandEffect.readOnly
           };
         }
@@ -45,8 +45,8 @@ export function createDebugNamespace(): CommandNamespaceDefinition {
             status: "OK",
             message:
               `debug observability: logLevel=${observability.logLevel} ` +
-              `profilerEnabled=${observability.profiler.enabled} ` +
-              `deepProfilerEnabled=${observability.deepProfiler.enabled} ` +
+              `profilerEnabled=${String(observability.profiler.enabled)} ` +
+              `deepProfilerEnabled=${String(observability.deepProfiler.enabled)} ` +
               `enabledNamespaces=${Object.keys(observability.enabledNamespaces).length} ` +
               `namespaceSampling=${Object.keys(observability.namespaceSampling).length}`,
             effect: CommandEffect.readOnly
