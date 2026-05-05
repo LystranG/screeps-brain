@@ -214,6 +214,12 @@ describe("command inspection|future|blocked", () => {
       namespaces.map(namespace => namespace.name),
       ["colony", "strategy", "spawn"]
     );
+    assert.include(renderNamespaceHelp(namespaces[0]), "cmd.colony.status()");
+    assert.include(renderNamespaceHelp(namespaces[1]), "cmd.strategy.status()");
+    assert.include(renderNamespaceHelp(namespaces[2]), "cmd.spawn.status()");
+    assert.include(renderNamespaceHelp(namespaces[0]), "requires colony context phase");
+    assert.include(renderNamespaceHelp(namespaces[1]), "requires strategy planning phase");
+    assert.include(renderNamespaceHelp(namespaces[2]), "requires spawn queue phase");
 
     for (const namespace of namespaces) {
       const help = renderNamespaceHelp(namespace);
