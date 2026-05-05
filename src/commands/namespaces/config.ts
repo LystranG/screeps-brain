@@ -92,7 +92,7 @@ function createNamespaceSamplingCommand(): CommandDefinition {
   return {
     name: "namespaceSampling",
     signature: "cmd.config.namespaceSampling(namespace, rate)",
-    description: "Set Memory.config.observability namespace sample rate.",
+    description: "Set Memory.config.observability.namespaceSampling[namespace] to rate.",
     effect: CommandEffect.writesMemory,
     run(args: readonly unknown[], context: CommandContext): CommandResult {
       const namespace = validateNamespace(args[0]);
@@ -119,7 +119,7 @@ function createNamespaceEnabledCommand(): CommandDefinition {
   return {
     name: "namespaceEnabled",
     signature: "cmd.config.namespaceEnabled(namespace, enabled)",
-    description: "Toggle Memory.config.observability enabled namespace flag.",
+    description: "Set Memory.config.observability.enabledNamespaces[namespace].enabled.",
     effect: CommandEffect.writesMemory,
     run(args: readonly unknown[], context: CommandContext): CommandResult {
       const namespace = validateNamespace(args[0]);
