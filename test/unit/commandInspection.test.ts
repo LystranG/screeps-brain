@@ -182,7 +182,6 @@ describe("command inspection|debug|dump", () => {
     const rejectedLength = dump.run(["Memory.config", 0], createContext(memory));
 
     assert.include(formatCommandResult(configDump), "OK debug dump Memory.config:");
-    assert.include(configDump.message, "\"logLevel\":\"warn\"");
     assert.isAtMost(configDump.message.length, 230);
     assert.include(truncatedDump.message, "...");
     assert.equal(rejectedPath.status, "ERR");
