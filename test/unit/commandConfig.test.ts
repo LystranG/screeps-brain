@@ -79,3 +79,80 @@ describe("command config|observability config", () => {
     assert.isUndefined(namespace.commands.find(candidate => candidate.name === "set"));
   });
 });
+
+describe("command config|confirm|policy", () => {
+  function createCommandMemory(): Memory {
+    return {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+  }
+
+  function createContext(memory: Memory) {
+    return {
+      game: createMockGame() as unknown as Game,
+      memory
+    };
+  }
+
+  it("updates existing manual construction and defense policy toggles", () => {
+    const memory = createCommandMemory();
+    memory.config.construction.enabled = true;
+    memory.config.defense.enabled = true;
+    const namespace = createConfigNamespace();
+    const construction = namespace.commands.find(candidate => candidate.name === "construction");
+    const defense = namespace.commands.find(candidate => candidate.name === "defense");
+
+    assert.equal(construction?.run([false], createContext(memory)).message, "construction: true -> false");
+    assert.equal(defense?.run([false], createContext(memory)).message, "defense: true -> false");
+    assert.equal(memory.config.construction.enabled, false);
+    assert.equal(memory.config.defense.enabled, false);
+  });
+
+  it("requires CONFIRM before mutating deep profiler config", () => {
+    const memory = createCommandMemory();
+    const namespace = createConfigNamespace();
+    const command = namespace.commands.find(candidate => candidate.name === "deepProfiler");
+
+    assert.deepEqual(command?.run([true], createContext(memory)), {
+      ok: false,
+      status: "CONFIRM",
+      message: "deepProfiler requires CONFIRM",
+      effect: "requires-confirm"
+    });
+    assert.equal(memory.config.observability.deepProfiler.enabled, false);
+
+    assert.equal(command?.run([true, "CONFIRM"], createContext(memory)).message, "deepProfiler: false -> true");
+    assert.equal(memory.config.observability.deepProfiler.enabled, true);
+  });
+
+  it("requires CONFIRM before mutating expansion and remote mining policy flags", () => {
+    const memory = createCommandMemory();
+    const namespace = createConfigNamespace();
+    const allowExpansion = namespace.commands.find(candidate => candidate.name === "allowExpansion");
+    const allowRemoteMining = namespace.commands.find(candidate => candidate.name === "allowRemoteMining");
+
+    assert.deepEqual(allowExpansion?.run([true], createContext(memory)), {
+      ok: false,
+      status: "CONFIRM",
+      message: "allowExpansion requires CONFIRM",
+      effect: "requires-confirm"
+    });
+    assert.deepEqual(allowRemoteMining?.run([true, "confirm"], createContext(memory)), {
+      ok: false,
+      status: "CONFIRM",
+      message: "allowRemoteMining requires CONFIRM",
+      effect: "requires-confirm"
+    });
+    assert.equal(memory.config.strategy.allowExpansion, false);
+    assert.equal(memory.config.strategy.allowRemoteMining, false);
+
+    assert.equal(allowExpansion?.run([true, "CONFIRM"], createContext(memory)).message, "allowExpansion: false -> true");
+    assert.equal(
+      allowRemoteMining?.run([true, "CONFIRM"], createContext(memory)).message,
+      "allowRemoteMining: false -> true"
+    );
+    assert.equal(memory.config.strategy.allowExpansion, true);
+    assert.equal(memory.config.strategy.allowRemoteMining, true);
+  });
+});
