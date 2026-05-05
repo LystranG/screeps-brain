@@ -5,9 +5,11 @@ import { CommandContext } from "commands/types";
 import { createDebugNamespace } from "commands/namespaces/debug";
 import { createEnvNamespace } from "commands/namespaces/env";
 import { createFutureNamespaces } from "commands/namespaces/future";
+import { createColonyNamespace } from "commands/namespaces/colony";
 import { createSimNamespace } from "commands/namespaces/sim";
+import { createDefaultCommandRegistry } from "commands/registry";
 import { createDefaultProjectMemorySections } from "memory/schema";
-import { createMockGame } from "./mock";
+import { createMockGame, createMockRoom } from "./mock";
 
 describe("command inspection|env|sim", () => {
   function createInspectionMemory(): Memory {
@@ -260,5 +262,133 @@ describe("command inspection|future|blocked", () => {
     assert.deepEqual(memory.commands.queue, []);
     assert.deepEqual(memory.commands.history, []);
     assert.equal(formatCommandResult(results[2]), "FUTURE spawn commands require spawn queue phase; no request queued");
+  });
+});
+
+describe("command inspection|colony", () => {
+  function createInspectionMemory(): Memory {
+    return {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+  }
+
+  function createContext(memory: Memory, game: ReturnType<typeof createMockGame>): CommandContext {
+    return {
+      game: game as unknown as Game,
+      memory
+    };
+  }
+
+  function createColonyGame(): ReturnType<typeof createMockGame> {
+    const game = createMockGame();
+    const primarySpawn = {
+      id: "spawn-primary",
+      name: "SpawnPrimary"
+    };
+    const remoteSpawn = {
+      id: "spawn-remote",
+      name: "SpawnRemote"
+    };
+
+    game.rooms = {
+      W1N1: createMockRoom({
+        name: "W1N1",
+        controller: { id: "controller-primary", my: true, level: 3 },
+        spawns: [primarySpawn],
+        sources: [{ id: "source-a" }, { id: "source-b" }],
+        creeps: [{ name: "Worker1" }],
+        constructionSites: [{ id: "site-a" }],
+        hostiles: [],
+        energyAvailable: 550,
+        energyCapacityAvailable: 800
+      }),
+      W1N2: createMockRoom({
+        name: "W1N2",
+        controller: { id: "controller-remote", my: true, level: 1 },
+        spawns: [remoteSpawn],
+        sources: [{ id: "source-c" }],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [{ name: "Invader" }],
+        energyAvailable: 300,
+        energyCapacityAvailable: 300
+      }),
+      W1N3: createMockRoom({
+        name: "W1N3",
+        controller: { id: "controller-degraded", my: true, level: 1 },
+        spawns: [],
+        sources: [],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [],
+        energyAvailable: 0,
+        energyCapacityAvailable: 0
+      })
+    };
+    game.spawns = {
+      SpawnPrimary: primarySpawn,
+      SpawnRemote: remoteSpawn
+    };
+
+    return game;
+  }
+
+  it("defines active read-only colony status, list, and detail commands", () => {
+    const memory = createInspectionMemory();
+    const game = createColonyGame();
+    memory.config.colony.primaryRoomName = "W1N1";
+    memory.processes.colonyIntel = {
+      id: "colonyIntel",
+      name: "Colony Intel",
+      enabled: true,
+      priority: 10,
+      cadence: 5,
+      nextRunTick: 128,
+      lastRunTick: 123,
+      lastResult: "scanned 3 colonies",
+      lastError: null
+    };
+    const namespace = createColonyNamespace();
+
+    const help = renderNamespaceHelp(namespace);
+    const status = namespace.commands[0].run([], createContext(memory, game));
+    const list = namespace.commands[1].run([], createContext(memory, game));
+    const detail = namespace.commands[2].run(["W1N1"], createContext(memory, game));
+    const rejectedDetail = namespace.commands[2].run([""], createContext(memory, game));
+
+    assert.equal(namespace.effect, CommandEffect.readOnly);
+    assert.deepEqual(
+      namespace.commands.map((command: { name: string }) => command.name),
+      ["status", "list", "detail"]
+    );
+    assert.include(help, "cmd.colony.status()");
+    assert.include(help, "cmd.colony.list()");
+    assert.include(help, "cmd.colony.detail(room)");
+    assert.include(status.message, "primary=W1N1");
+    assert.include(status.message, "contexts=3");
+    assert.include(status.message, "ready=2");
+    assert.include(status.message, "degraded=1");
+    assert.include(status.message, "missing=W1N3:missing spawn,missing source");
+    assert.include(status.message, "processes=colonyIntel:ok@123->128");
+    assert.include(list.message, "W1N1 primary ready rcl=3 energy=550/800 sources=2 spawns=1 creeps=1 sites=1 hostiles=0");
+    assert.include(list.message, "W1N2 secondary ready rcl=1 energy=300/300 sources=1 spawns=1 creeps=0 sites=0 hostiles=1");
+    assert.include(detail.message, "colony detail W1N1:");
+    assert.include(detail.message, "stage=rcl3");
+    assert.include(detail.message, "controller=controller-primary");
+    assert.include(detail.message, "spawns=SpawnPrimary");
+    assert.equal(rejectedDetail.status, "ERR");
+    assert.include(rejectedDetail.message, "room must be a non-empty string");
+    assert.equal(memory.config.colony.primaryRoomName, "W1N1");
+    assert.deepEqual(memory.colonies, {});
+  });
+
+  it("registers colony as active namespace instead of future placeholder", () => {
+    const registry = createDefaultCommandRegistry();
+    const futureNames = createFutureNamespaces().map(namespace => namespace.name);
+
+    assert.isDefined(registry.getNamespace("colony"));
+    assert.notInclude(futureNames, "colony");
+    assert.include(renderNamespaceHelp(registry.getNamespace("colony")!), "cmd.colony.list()");
   });
 });
