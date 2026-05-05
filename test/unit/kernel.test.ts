@@ -237,7 +237,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, ["missing spawn", "missing source"]);
     assert.equal(memory.processes.colonyIntel.lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastRunTick, 200);
-    assert.include(memory.processes.creepRoles.lastResult ?? "", "role behavior deferred to Phase 6");
+    assert.equal(memory.processes.creepRoles.lastResult, "creep roles dispatched");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
     assert.deepEqual(spawn.calls[0].options, {
       memory: { role: "worker" },

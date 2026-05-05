@@ -1,11 +1,14 @@
 import { KERNEL_STAGE_ORDER, LifecycleStage, LifecycleStageName } from "runtime/lifecycle";
 import { RuntimeServices, createRuntimeServices } from "runtime/services";
+import { buildColonyContexts } from "colony/context";
 import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
 import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
+import { createDefaultProcessDefinitions, runProcessDefinitions } from "processes/runner";
 import { flushRuntimeStats } from "stats/Stats";
 import { installConsoleCommands } from "commands/installer";
 import { runMemoryMigrations } from "memory/migrations";
 import { runSimBootstrap } from "environment/simBootstrap";
+import { runSpawnValidation } from "spawning/runner";
 
 export interface KernelStageFailure {
   stage: LifecycleStageName;
@@ -153,11 +156,43 @@ export class Kernel {
   }
 
   private runColoniesAndProcesses(): void {
-    return;
+    const services = this.requireServices();
+    const result = buildColonyContexts(Memory, Game, Game.time);
+
+    for (const error of result.errors) {
+      services.logger.error("kernel:colonies", error);
+    }
+
+    for (const context of result.contexts) {
+      if (context.readiness === "error") {
+        services.logger.error("kernel:colonies", `${context.roomName}: ${context.missingReasons.join(",")}`);
+      }
+    }
+
+    const processResults = runProcessDefinitions(
+      result.contexts,
+      services,
+      Memory,
+      Game,
+      Game.time,
+      createDefaultProcessDefinitions()
+    );
+
+    for (const processResult of processResults) {
+      if (processResult.status === "error") {
+        services.logger.error("kernel:processes", `${processResult.processId}: ${processResult.message}`);
+      }
+    }
   }
 
   private runSpawning(): void {
-    return;
+    const services = this.requireServices();
+    const result = buildColonyContexts(Memory, Game, Game.time);
+    const spawnResult = runSpawnValidation(result.contexts, Memory, Game, Game.time);
+
+    if (spawnResult.status === "error") {
+      services.logger.error("kernel:spawning", `${spawnResult.requestId ?? "unknown"}: ${spawnResult.reason}`);
+    }
   }
 
   private cleanup(): void {
