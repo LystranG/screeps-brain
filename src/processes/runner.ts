@@ -1,0 +1,146 @@
+import { ColonyContext } from "colony/types";
+import { ProcessName } from "constants/processes";
+import { ProcessMemory } from "memory/schema";
+import { ProcessDefinition, ProcessDefinitionResult, ProcessRunResult, ProcessRunnerContext } from "processes/types";
+import { RuntimeServices } from "runtime/services";
+import { RoleRegistry, createDefaultRoleRegistry } from "roles/registry";
+
+export function runProcessDefinitions(
+  contexts: readonly ColonyContext[],
+  services: RuntimeServices,
+  memory: Memory,
+  game: Game,
+  tick: number,
+  definitions: readonly ProcessDefinition[]
+): ProcessRunResult[] {
+  const sortedDefinitions = [...definitions].sort((left, right) => left.priority - right.priority);
+  const runnerContext: ProcessRunnerContext = {
+    contexts,
+    services,
+    memory,
+    game,
+    tick
+  };
+
+  return sortedDefinitions.map(definition => runSingleProcess(definition, runnerContext));
+}
+
+export function createDefaultProcessDefinitions(roleRegistry: RoleRegistry = createDefaultRoleRegistry()): ProcessDefinition[] {
+  return [
+    {
+      id: ProcessName.colonyIntel,
+      name: ProcessName.colonyIntel,
+      enabled: true,
+      priority: 10,
+      cadence: 5,
+      run(context: ProcessRunnerContext): ProcessDefinitionResult {
+        return {
+          status: "ok",
+          message: `observed ${context.contexts.length} colonies`
+        };
+      }
+    },
+    {
+      id: ProcessName.creepRoles,
+      name: ProcessName.creepRoles,
+      enabled: true,
+      priority: 20,
+      cadence: 1,
+      run(context: ProcessRunnerContext): ProcessDefinitionResult {
+        const dispatchMessages: string[] = [];
+
+        for (const colony of context.contexts) {
+          for (const creep of colony.creeps) {
+            const roleName = creep.memory.role;
+
+            if (roleName === undefined) {
+              dispatchMessages.push(`${creep.name ?? "unnamed"} missing role`);
+              continue;
+            }
+
+            const result = roleRegistry.run(roleName, creep, {
+              colony,
+              services: context.services,
+              game: context.game,
+              tick: context.tick
+            });
+
+            if (!result.ok) {
+              dispatchMessages.push(result.reason);
+            }
+          }
+        }
+
+        return {
+          status: "ok",
+          message: dispatchMessages.length === 0 ? "creep roles dispatched" : dispatchMessages.join("; ")
+        };
+      }
+    }
+  ];
+}
+
+function runSingleProcess(definition: ProcessDefinition, context: ProcessRunnerContext): ProcessRunResult {
+  const state = ensureProcessMemory(context.memory, definition);
+
+  if (!state.enabled) {
+    return {
+      processId: definition.id,
+      status: "skipped",
+      message: "process disabled"
+    };
+  }
+
+  if (state.nextRunTick > context.tick) {
+    return {
+      processId: definition.id,
+      status: "skipped",
+      message: `nextRunTick ${state.nextRunTick} is greater than current tick ${context.tick}`
+    };
+  }
+
+  try {
+    const result = definition.run(context);
+
+    state.lastRunTick = context.tick;
+    state.lastResult = result.message;
+    state.lastError = null;
+    state.nextRunTick = context.tick + state.cadence;
+
+    return {
+      processId: definition.id,
+      ...result
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown process failure";
+
+    state.lastRunTick = context.tick;
+    state.lastResult = null;
+    state.lastError = message;
+    state.nextRunTick = context.tick + state.cadence;
+
+    return {
+      processId: definition.id,
+      status: "error",
+      message
+    };
+  }
+}
+
+function ensureProcessMemory(memory: Memory, definition: ProcessDefinition): ProcessMemory {
+  if (memory.processes[definition.id] === undefined) {
+    memory.processes[definition.id] = {
+      id: definition.id,
+      name: definition.name,
+      enabled: definition.enabled,
+      priority: definition.priority,
+      cadence: definition.cadence,
+      nextRunTick: 0,
+      lastRunTick: null,
+      lastResult: null,
+      lastError: null
+    };
+  }
+
+  return memory.processes[definition.id];
+}
