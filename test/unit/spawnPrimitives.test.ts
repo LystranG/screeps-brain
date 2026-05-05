@@ -69,7 +69,7 @@ describe("spawn primitives body builder", () => {
 describe("spawn primitives dry-run runner", () => {
   it("skips when there is no queued request or no idle spawn", () => {
     const memory = createMemoryWithDefaults();
-    const noRequest = runSpawnValidation([createContext("W1N1", true, [createSpawn("Spawn1")])], memory, {}, 20);
+    const noRequest = runSpawnValidation([createContext("W1N1", true, [createSpawn("Spawn1")])], memory, {} as Game, 20);
 
     assert.isFalse(noRequest.ok);
     assert.equal(noRequest.status, "skipped");
@@ -89,7 +89,12 @@ describe("spawn primitives dry-run runner", () => {
       })
     );
 
-    const noIdleSpawn = runSpawnValidation([createContext("W1N1", true, [createSpawn("Spawn1", true)])], memory, {}, 21);
+    const noIdleSpawn = runSpawnValidation(
+      [createContext("W1N1", true, [createSpawn("Spawn1", true)])],
+      memory,
+      {} as Game,
+      21
+    );
 
     assert.isFalse(noIdleSpawn.ok);
     assert.equal(noIdleSpawn.status, "skipped");
@@ -113,7 +118,7 @@ describe("spawn primitives dry-run runner", () => {
       })
     );
 
-    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {}, 22);
+    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {} as Game, 22);
 
     assert.isTrue(result.ok);
     assert.equal(result.status, "validated");
@@ -143,7 +148,7 @@ describe("spawn primitives dry-run runner", () => {
       })
     );
 
-    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {}, 23);
+    const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {} as Game, 23);
 
     assert.isFalse(result.ok);
     assert.equal(result.status, "error");
