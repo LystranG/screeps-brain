@@ -1,5 +1,5 @@
-import { Logger } from "logging/Logger";
 import { LoggerNamespace, RuntimeEnvironment } from "constants/runtime";
+import { Logger } from "logging/Logger";
 import { detectRuntimeEnvironment } from "environment/detection";
 
 export const SIM_BOOTSTRAP_VERSION = 1;
