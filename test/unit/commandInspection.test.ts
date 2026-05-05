@@ -4,6 +4,7 @@ import { formatCommandResult, renderNamespaceHelp } from "commands/formatter";
 import { CommandContext } from "commands/types";
 import { createDebugNamespace } from "commands/namespaces/debug";
 import { createEnvNamespace } from "commands/namespaces/env";
+import { createFutureNamespaces } from "commands/namespaces/future";
 import { createSimNamespace } from "commands/namespaces/sim";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame } from "./mock";
@@ -188,5 +189,70 @@ describe("command inspection|debug|dump", () => {
     assert.include(rejectedPath.message, "Dump path must be one of");
     assert.equal(rejectedLength.status, "ERR");
     assert.include(rejectedLength.message, "maxLength must be an integer from 1 through 2000");
+  });
+});
+
+describe("command inspection|future|blocked", () => {
+  function createInspectionMemory(): Memory {
+    return {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+  }
+
+  function createContext(memory: Memory): CommandContext {
+    return {
+      game: createMockGame() as unknown as Game,
+      memory
+    };
+  }
+
+  it("defines colony, strategy, and spawn as future/blocked read-only namespaces", () => {
+    const namespaces = createFutureNamespaces();
+
+    assert.deepEqual(
+      namespaces.map(namespace => namespace.name),
+      ["colony", "strategy", "spawn"]
+    );
+
+    for (const namespace of namespaces) {
+      const help = renderNamespaceHelp(namespace);
+
+      assert.equal(namespace.effect, CommandEffect.futureBlocked);
+      assert.lengthOf(namespace.commands, 1);
+      assert.equal(namespace.commands[0].effect, CommandEffect.futureBlocked);
+      assert.include(help, "future/blocked");
+      assert.include(help, `cmd.${namespace.name}.status()`);
+    }
+  });
+
+  it("returns FUTURE dependency messages without queueing requests", () => {
+    const memory = createInspectionMemory();
+    const namespaces = createFutureNamespaces();
+    const results = namespaces.map(namespace => namespace.commands[0].run([], createContext(memory)));
+
+    assert.deepEqual(results, [
+      {
+        ok: false,
+        status: "FUTURE",
+        message: "colony commands require colony context phase; no request queued",
+        effect: CommandEffect.futureBlocked
+      },
+      {
+        ok: false,
+        status: "FUTURE",
+        message: "strategy commands require strategy planning phase; no request queued",
+        effect: CommandEffect.futureBlocked
+      },
+      {
+        ok: false,
+        status: "FUTURE",
+        message: "spawn commands require spawn queue phase; no request queued",
+        effect: CommandEffect.futureBlocked
+      }
+    ]);
+    assert.deepEqual(memory.commands.queue, []);
+    assert.deepEqual(memory.commands.history, []);
+    assert.equal(formatCommandResult(results[2]), "FUTURE spawn commands require spawn queue phase; no request queued");
   });
 });
