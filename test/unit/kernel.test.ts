@@ -7,6 +7,18 @@ import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecy
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
 describe("kernel|stats cleanup|kernel runtime kernel", () => {
+  const expectedCommandStageOrder: LifecycleStageName[] = [
+    "migrate",
+    "refreshServices",
+    "installCommands",
+    "detectEnvironmentBootstrap",
+    "runColoniesAndProcesses",
+    "runSpawning",
+    "cleanup",
+    "flushStats"
+  ];
+  const expectedCommandStageOrderAudit = ["migrate", "refreshServices", "installCommands", "detectEnvironmentBootstrap"];
+
   interface KernelCommandGlobalState {
     cmd?: {
       help(): string;
@@ -50,15 +62,12 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.deepEqual(result.executedStages, expectedStageOrder);
     assert.deepEqual(observedStages, expectedStageOrder);
     assert.deepEqual(result.failures, []);
-    assert.deepEqual(expectedStageOrder, [
+    assert.deepEqual(expectedStageOrder, expectedCommandStageOrder);
+    assert.deepEqual(expectedCommandStageOrderAudit, [
       "migrate",
       "refreshServices",
       "installCommands",
-      "detectEnvironmentBootstrap",
-      "runColoniesAndProcesses",
-      "runSpawning",
-      "cleanup",
-      "flushStats"
+      "detectEnvironmentBootstrap"
     ]);
   });
 
@@ -151,7 +160,10 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.runtime.environment.type, RuntimeEnvironment.world);
     assert.equal(memory.runtime.environment.shard, "shard0");
     assert.exists((global as unknown as KernelCommandGlobalState).cmd);
-    assert.isString((global as unknown as KernelCommandGlobalState).cmd?.help());
+    const cmd = (global as unknown as KernelCommandGlobalState).cmd;
+
+    assert.isString(cmd?.help());
+    assert.include(cmd?.help() ?? "", "cmd.env.help()");
     assert.isAtLeast(memory.stats.cpu.stages.cleanup.samples, 1);
     assert.containsAllKeys(memory.stats.cpu.stages, [
       "installCommands",

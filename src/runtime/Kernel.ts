@@ -3,6 +3,7 @@ import { RuntimeServices, createRuntimeServices } from "runtime/services";
 import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
 import { cleanupDeadCreepMemory } from "cleanup/creepMemory";
 import { flushRuntimeStats } from "stats/Stats";
+import { installConsoleCommands } from "commands/installer";
 import { runMemoryMigrations } from "memory/migrations";
 import { runSimBootstrap } from "environment/simBootstrap";
 
@@ -98,6 +99,8 @@ export class Kernel {
         return () => this.migrate();
       case "refreshServices":
         return () => this.refreshServices();
+      case "installCommands":
+        return () => this.installCommands();
       case "detectEnvironmentBootstrap":
         return () => this.detectEnvironmentBootstrap();
       case "runColoniesAndProcesses":
@@ -133,6 +136,10 @@ export class Kernel {
 
   private refreshServices(): void {
     this.services = createRuntimeServices(Memory, Game);
+  }
+
+  private installCommands(): void {
+    installConsoleCommands();
   }
 
   private detectEnvironmentBootstrap(): void {

@@ -2,6 +2,7 @@
 export const KERNEL_STAGE_ORDER = [
   "migrate",
   "refreshServices",
+  "installCommands",
   "detectEnvironmentBootstrap",
   "runColoniesAndProcesses",
   "runSpawning",
