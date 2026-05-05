@@ -222,6 +222,46 @@ describe("memory migrations", () => {
     assert.deepEqual(memory.commands.history, []);
   });
 
+  it("repairs nested current-version runtime and colony config sections", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: CURRENT_MEMORY_VERSION,
+        migrationError: null,
+        environment: {
+          type: "sim"
+        }
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {}
+      },
+      stats: {
+        ticks: 12,
+        cpu: {}
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.deepEqual(memory.runtime.environment, {
+      type: "sim",
+      shard: "unknown",
+      lastChangedTick: 0,
+      lastSeenTick: 0
+    });
+    assert.deepEqual(memory.config.colony, {
+      primaryRoomName: null,
+      intelRefreshCadence: 50
+    });
+  });
+
   it("preserves legacy CPU stage summaries when migrating to v2", () => {
     const legacyHarvest = {
       last: 2,
