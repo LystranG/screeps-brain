@@ -174,6 +174,12 @@ function migrateToVersion2(memory: Memory): void {
       }
     }
   };
+  memory.colonies = memory.colonies || defaults.colonies;
+  memory.processes = memory.processes || defaults.processes;
+  memory.commands = {
+    queue: memory.commands?.queue || defaults.commands.queue,
+    history: memory.commands?.history || defaults.commands.history
+  };
   memory.creeps = memory.creeps || {};
 }
 

@@ -193,6 +193,10 @@ describe("memory migrations", () => {
     assert.equal(memory.runtime.environment.type, "unknown");
     assert.isFalse(memory.runtime.sim.bootstrap.completed);
     assert.deepEqual(memory.stats.cpu.stages, {});
+    assert.deepEqual(memory.colonies, {});
+    assert.deepEqual(memory.processes, {});
+    assert.deepEqual(memory.commands.queue, []);
+    assert.deepEqual(memory.commands.history, []);
   });
 
   it("preserves legacy CPU stage summaries when migrating to v2", () => {
