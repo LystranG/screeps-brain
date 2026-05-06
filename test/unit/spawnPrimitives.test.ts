@@ -7,10 +7,14 @@ import {
   createSpawnRequest,
   enqueueSpawnRequest,
   markSpawnRequestError,
+  markSpawnRequestSpawned,
+  markSpawnRequestSpawning,
+  markSpawnRequestWaiting,
   markSpawnRequestValidated,
+  selectNextSpawnRequestByStatus,
   selectNextSpawnRequest
 } from "spawning/queue";
-import { runSpawnValidation } from "spawning/runner";
+import { runSpawnLifecycle, runSpawnValidation } from "spawning/runner";
 
 before(() => {
   const globals = global as unknown as { [name: string]: unknown };
@@ -23,8 +27,12 @@ before(() => {
     move: 50
   };
   globals.OK = 0;
+  globals.ERR_BUSY = -4;
+  globals.ERR_NAME_EXISTS = -3;
   globals.ERR_INVALID_ARGS = -10;
   globals.ERR_NOT_ENOUGH_ENERGY = -6;
+  globals.ERR_NOT_OWNER = -1;
+  globals.ERR_RCL_NOT_ENOUGH = -14;
 });
 
 describe("spawn primitives body builder", () => {
@@ -260,6 +268,132 @@ describe("spawn primitives dry-run runner", () => {
   });
 });
 
+describe("spawn primitives lifecycle runner", () => {
+  it("queued -> validated -> spawning -> spawned through dry-run, real spawn, and creep appearance", () => {
+    const memory = createMemoryWithDefaults();
+    const spawn = createSpawn("Spawn1");
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-lifecycle",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "full lifecycle",
+        requestedTick: 40
+      })
+    );
+
+    const validated = runSpawnLifecycle([createContext("W1N1", true, [spawn])], memory, { creeps: {} } as Game, 40);
+
+    assert.isTrue(validated.ok);
+    assert.equal(validated.status, "validated");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
+    assert.isTrue(spawn.calls[0].options.dryRun);
+
+    const spawning = runSpawnLifecycle([createContext("W1N1", true, [spawn])], memory, { creeps: {} } as Game, 41);
+    const request = memory.colonies.W1N1.spawnQueue[0];
+
+    assert.isTrue(spawning.ok);
+    assert.equal(spawning.status, "spawning");
+    assert.equal(request.status, "spawning");
+    assert.equal(request.spawnName, "Spawn1");
+    assert.equal(request.creepName, "bootstrap-worker-W1N1-41-spawn-worker-lifecycle");
+    assert.equal(request.lastTriedTick, 41);
+    assert.isNull(request.completedTick);
+    assert.deepEqual(spawn.calls[1].options, {
+      memory: { role: "worker" }
+    });
+
+    const spawned = runSpawnLifecycle(
+      [createContext("W1N1", true, [spawn])],
+      memory,
+      { creeps: { "bootstrap-worker-W1N1-41-spawn-worker-lifecycle": {} as Creep } } as unknown as Game,
+      42
+    );
+
+    assert.isTrue(spawned.ok);
+    assert.equal(spawned.status, "spawned");
+    assert.equal(request.status, "spawned");
+    assert.equal(request.completedTick, 42);
+  });
+
+  it("records recoverable spawn wait states without consuming attempts", () => {
+    const memory = createMemoryWithDefaults();
+    const request = createSpawnRequest({
+      id: "spawn-worker-wait",
+      roomName: "W1N1",
+      role: "worker",
+      priority: 1,
+      body: ["work", "carry", "move"],
+      memory: { role: "worker" } as CreepMemory,
+      reason: "recoverable wait",
+      requestedTick: 50
+    });
+    request.status = "validated";
+    enqueueSpawnRequest(memory, request);
+
+    const energyWait = runSpawnLifecycle(
+      [createContext("W1N1", true, [createSpawn("Spawn1", false, ERR_NOT_ENOUGH_ENERGY)])],
+      memory,
+      { creeps: {} } as Game,
+      51
+    );
+
+    assert.isFalse(energyWait.ok);
+    assert.equal(energyWait.status, "waiting");
+    assert.equal(request.status, "validated");
+    assert.equal(request.attempts, 0);
+    assert.equal(request.lastError, "-6");
+    assert.equal(request.lastTriedTick, 51);
+
+    const busyWait = runSpawnLifecycle(
+      [createContext("W1N1", true, [createSpawn("Spawn1", false, ERR_BUSY)])],
+      memory,
+      { creeps: {} } as Game,
+      52
+    );
+
+    assert.isFalse(busyWait.ok);
+    assert.equal(busyWait.status, "waiting");
+    assert.equal(request.status, "validated");
+    assert.equal(request.attempts, 0);
+    assert.equal(request.lastError, "-4");
+    assert.equal(request.lastTriedTick, 52);
+  });
+
+  it("marks fatal real spawn errors failed", () => {
+    const memory = createMemoryWithDefaults();
+    const request = createSpawnRequest({
+      id: "spawn-worker-fatal",
+      roomName: "W1N1",
+      role: "worker",
+      priority: 1,
+      body: ["work", "carry", "move"],
+      memory: { role: "worker" } as CreepMemory,
+      reason: "fatal real spawn",
+      requestedTick: 60
+    });
+    request.status = "validated";
+    enqueueSpawnRequest(memory, request);
+
+    const result = runSpawnLifecycle(
+      [createContext("W1N1", true, [createSpawn("Spawn1", false, ERR_NAME_EXISTS)])],
+      memory,
+      { creeps: {} } as Game,
+      61
+    );
+
+    assert.isFalse(result.ok);
+    assert.equal(result.status, "failed");
+    assert.equal(request.status, "failed");
+    assert.equal(request.lastError, "-3");
+    assert.equal(request.lastTriedTick, 61);
+  });
+});
+
 describe("spawn primitives spawn queue", () => {
   it("creates explainable queued requests and rejects duplicate spawn request id values", () => {
     const memory = createMemoryWithDefaults();
@@ -378,6 +512,46 @@ describe("spawn primitives spawn queue", () => {
     markSpawnRequestValidated(memory, "W1N1", "spawn-worker-2", 19);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, null);
+  });
+
+  it("selects and mutates lifecycle statuses explicitly", () => {
+    const memory = createMemoryWithDefaults();
+    const request = createSpawnRequest({
+      id: "spawn-worker-status",
+      roomName: "W1N1",
+      role: "worker",
+      priority: 3,
+      body: ["work", "carry", "move"],
+      memory: { role: "worker" } as CreepMemory,
+      reason: "status helpers",
+      requestedTick: 70
+    });
+    request.status = "validated";
+    enqueueSpawnRequest(memory, request);
+
+    const selected = selectNextSpawnRequestByStatus(
+      [createContext("W1N1", true, [createSpawn("Spawn1")])],
+      memory,
+      "validated"
+    );
+
+    assert.equal(selected?.request.id, "spawn-worker-status");
+
+    markSpawnRequestWaiting(memory, "W1N1", "spawn-worker-status", ERR_BUSY, 71);
+    assert.equal(request.status, "validated");
+    assert.equal(request.attempts, 0);
+    assert.equal(request.lastError, "-4");
+    assert.equal(request.lastTriedTick, 71);
+
+    markSpawnRequestSpawning(memory, "W1N1", "spawn-worker-status", "Spawn1", "Worker1", 72);
+    assert.equal(request.status, "spawning");
+    assert.equal(request.spawnName, "Spawn1");
+    assert.equal(request.creepName, "Worker1");
+    assert.equal(request.lastTriedTick, 72);
+
+    markSpawnRequestSpawned(memory, "W1N1", "spawn-worker-status", 73);
+    assert.equal(request.status, "spawned");
+    assert.equal(request.completedTick, 73);
   });
 });
 
