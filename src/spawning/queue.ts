@@ -75,6 +75,14 @@ export function selectNextSpawnRequest(
   contexts: ColonyContext[],
   memory: ProjectMemoryShape
 ): SelectedSpawnRequest | null {
+  return selectNextSpawnRequestByStatus(contexts, memory, "queued");
+}
+
+export function selectNextSpawnRequestByStatus(
+  contexts: ColonyContext[],
+  memory: ProjectMemoryShape,
+  status: SpawnRequestMemory["status"]
+): SelectedSpawnRequest | null {
   const contextByRoomName = createContextByRoomName(contexts);
   const candidates: SelectedSpawnRequest[] = [];
 
@@ -88,7 +96,7 @@ export function selectNextSpawnRequest(
     const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
 
     for (const request of queue) {
-      if (request.status === "queued" && isUsableSpawnCandidate(context, request)) {
+      if (request.status === status && isUsableSpawnCandidate(context, request, status)) {
         candidates.push({ context, request });
       }
     }
@@ -147,6 +155,88 @@ export function markSpawnRequestValidated(
   request.status = "validated";
   request.lastError = null;
   request.requestedTick = tick;
+  request.lastTriedTick = tick;
+
+  return {
+    ok: true,
+    request
+  };
+}
+
+export function markSpawnRequestWaiting(
+  memory: ProjectMemoryShape,
+  roomName: string,
+  requestId: string,
+  code: ScreepsReturnCode,
+  tick: number
+): SpawnQueueResult {
+  const request = findSpawnRequest(memory, roomName, requestId);
+
+  if (!request) {
+    return {
+      ok: false,
+      error: `spawn request not found: ${requestId}`
+    };
+  }
+
+  request.lastError = String(code);
+  request.lastTriedTick = tick;
+  request.requestedTick = tick;
+
+  return {
+    ok: true,
+    request
+  };
+}
+
+export function markSpawnRequestSpawning(
+  memory: ProjectMemoryShape,
+  roomName: string,
+  requestId: string,
+  spawnName: string,
+  creepName: string,
+  tick: number
+): SpawnQueueResult {
+  const request = findSpawnRequest(memory, roomName, requestId);
+
+  if (!request) {
+    return {
+      ok: false,
+      error: `spawn request not found: ${requestId}`
+    };
+  }
+
+  request.status = "spawning";
+  request.spawnName = spawnName;
+  request.creepName = creepName;
+  request.lastTriedTick = tick;
+  request.completedTick = null;
+  request.lastError = null;
+
+  return {
+    ok: true,
+    request
+  };
+}
+
+export function markSpawnRequestSpawned(
+  memory: ProjectMemoryShape,
+  roomName: string,
+  requestId: string,
+  tick: number
+): SpawnQueueResult {
+  const request = findSpawnRequest(memory, roomName, requestId);
+
+  if (!request) {
+    return {
+      ok: false,
+      error: `spawn request not found: ${requestId}`
+    };
+  }
+
+  request.status = "spawned";
+  request.completedTick = tick;
+  request.lastError = null;
 
   return {
     ok: true,
@@ -172,6 +262,7 @@ export function markSpawnRequestError(
 
   request.attempts += 1;
   request.lastError = error;
+  request.lastTriedTick = tick;
   request.requestedTick = tick;
   request.status = request.attempts >= MAX_VALIDATION_ATTEMPTS ? "failed" : "queued";
 
@@ -181,9 +272,17 @@ export function markSpawnRequestError(
   };
 }
 
-function isUsableSpawnCandidate(context: ColonyContext, request: SpawnRequestMemory): boolean {
+function isUsableSpawnCandidate(
+  context: ColonyContext,
+  request: SpawnRequestMemory,
+  status: SpawnRequestMemory["status"]
+): boolean {
   if (context.readiness !== "ready") {
     return false;
+  }
+
+  if (status === "spawning" || status === "spawned" || status === "failed") {
+    return true;
   }
 
   if (!hasIdleSpawn(context)) {
