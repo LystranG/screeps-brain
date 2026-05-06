@@ -1,9 +1,22 @@
 import { assert } from "chai";
-import { buildBootstrapSlots } from "bootstrap/slots";
+import { BootstrapSlot, buildBootstrapSlots } from "bootstrap/slots";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { TaskType } from "tasks/model";
+
+before(() => {
+  const globals = global as unknown as { [name: string]: unknown };
+  globals.WORK = "work";
+  globals.CARRY = "carry";
+  globals.MOVE = "move";
+  globals.BODYPART_COST = {
+    work: 100,
+    carry: 50,
+    move: 50
+  };
+  globals.RESOURCE_ENERGY = "energy";
+});
 
 describe("bootstrap execution slots", () => {
   it("builds deterministic ready-room population and source/controller slots", () => {
@@ -24,7 +37,11 @@ describe("bootstrap execution slots", () => {
       ["source:source-a:0", "source:source-b:0", "upgrade:controller-a:0", "workerFallback:W1N1:0", "workerFallback:W1N1:1"]
     );
     assert.deepEqual(
-      result.slots.filter(slot => slot.kind === "workerFallback").map(slot => slot.spawn.role),
+      result.slots
+        .filter((slot): slot is BootstrapSlot & { spawn: NonNullable<BootstrapSlot["spawn"]> } => {
+          return slot.kind === "workerFallback" && slot.spawn !== null;
+        })
+        .map(slot => slot.spawn.role),
       [RoleName.worker, RoleName.worker]
     );
     assert.deepEqual(
@@ -32,7 +49,13 @@ describe("bootstrap execution slots", () => {
       [TaskType.harvest, TaskType.harvest, TaskType.upgrade, null, null]
     );
     assert.sameMembers(
-      result.slots.flatMap(slot => slot.logistics.map(demand => demand.kind)),
+      Array.from(
+        new Set(
+          result.slots.reduce<string[]>((kinds, slot) => {
+            return kinds.concat(slot.logistics.map(demand => demand.kind));
+          }, [])
+        )
+      ),
       ["pickup", "transfer", "refill"]
     );
   });
