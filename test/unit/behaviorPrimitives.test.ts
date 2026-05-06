@@ -222,7 +222,7 @@ describe("behavior primitives task executor", () => {
 });
 
 describe("behavior primitives role registry", () => {
-  it("registers default skeleton roles with blocked phase status", () => {
+  it("registers default bootstrap roles and keeps builder deferred", () => {
     const registry = createDefaultRoleRegistry();
 
     assert.deepEqual(
@@ -230,7 +230,7 @@ describe("behavior primitives role registry", () => {
       [RoleName.worker, RoleName.harvester, RoleName.upgrader, RoleName.builder]
     );
 
-    const result = registry.run(RoleName.worker, createNoopCreep(RoleName.worker), createRoleContext());
+    const result = registry.run(RoleName.builder, createNoopCreep(RoleName.builder), createRoleContext());
 
     assert.deepEqual(result, {
       ok: true,
@@ -250,21 +250,34 @@ describe("behavior primitives role registry", () => {
     });
   });
 
-  it("keeps default role runners side-effect free", () => {
+  it("executes harvest tasks through worker and harvester roles", () => {
     const registry = createDefaultRoleRegistry();
-    const creep = {
-      memory: {
-        role: RoleName.harvester
-      },
-      harvest: () => assert.fail("harvest should not be called"),
-      upgradeController: () => assert.fail("upgradeController should not be called"),
-      build: () => assert.fail("build should not be called"),
-      moveTo: () => assert.fail("moveTo should not be called")
-    } as unknown as Creep;
+    const source = createIdentifiedTarget<Source>("source-1");
+    const worker = createActionCreep(RoleName.worker, 0, 50, { harvest: OK });
+    const harvester = createActionCreep(RoleName.harvester, 0, 50, { harvest: ERR_NOT_IN_RANGE });
 
-    const result = registry.run(RoleName.harvester, creep, createRoleContext());
+    worker.memory.task = createTaskMemory(TaskType.harvest, source.id, 280);
+    harvester.memory.task = createTaskMemory(TaskType.harvest, source.id, 280);
 
-    assert.equal(result.status, "blocked");
+    const workerResult = registry.run(RoleName.worker, worker, createRoleContext({ sources: [source], tick: 281 }));
+    const harvesterResult = registry.run(RoleName.harvester, harvester, createRoleContext({ sources: [source], tick: 281 }));
+
+    assert.equal(workerResult.reason, "harvest running");
+    assert.equal(harvesterResult.reason, "harvest moving");
+    assert.deepEqual(worker.actionCalls.map(call => call.action), ["harvest"]);
+    assert.deepEqual(harvester.actionCalls.map(call => call.action), ["harvest", "moveTo"]);
+  });
+
+  it("executes upgrade tasks through upgrader roles", () => {
+    const registry = createDefaultRoleRegistry();
+    const controller = createIdentifiedTarget<StructureController>("controller-1");
+    const creep = createActionCreep(RoleName.upgrader, 50, 0, { upgradeController: OK });
+
+    creep.memory.task = createTaskMemory(TaskType.upgrade, controller.id, 290);
+    const result = registry.run(RoleName.upgrader, creep, createRoleContext({ controller, tick: 291 }));
+
+    assert.equal(result.reason, "upgrade running");
+    assert.deepEqual(creep.actionCalls.map(call => call.action), ["upgradeController"]);
   });
 });
 

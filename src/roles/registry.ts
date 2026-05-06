@@ -1,6 +1,7 @@
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { RuntimeServices } from "runtime/services";
+import { runCreepTask } from "tasks/executor";
 
 export interface RoleRunResult {
   ok: boolean;
@@ -33,9 +34,9 @@ const DEFERRED_ROLE_REASON = "role behavior deferred to Phase 6";
 
 export function createDefaultRoleRegistry(): RoleRegistry {
   return createRoleRegistry([
-    createDeferredRole(RoleName.worker),
-    createDeferredRole(RoleName.harvester),
-    createDeferredRole(RoleName.upgrader),
+    createTaskExecutingRole(RoleName.worker),
+    createTaskExecutingRole(RoleName.harvester),
+    createTaskExecutingRole(RoleName.upgrader),
     createDeferredRole(RoleName.builder)
   ]);
 }
@@ -78,5 +79,13 @@ function createDeferredRole(name: RoleName): RoleDefinition {
         reason: DEFERRED_ROLE_REASON
       };
     }
+  };
+}
+
+function createTaskExecutingRole(name: RoleName): RoleDefinition {
+  return {
+    name,
+    description: "execute assigned creep task memory",
+    run: runCreepTask
   };
 }
