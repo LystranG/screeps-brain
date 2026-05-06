@@ -1,10 +1,14 @@
 import { assert } from "chai";
 import { applyBootstrapSpawnDemand } from "bootstrap/spawnDemand";
+import { runBootstrapExecution } from "bootstrap/runner";
 import { BootstrapSlot, buildBootstrapSlots } from "bootstrap/slots";
 import { assignBootstrapTasks } from "bootstrap/taskAssignment";
 import { ColonyContext } from "colony/types";
+import { ProcessName } from "constants/processes";
 import { RoleName } from "constants/roles";
 import { createDefaultProjectMemorySections } from "memory/schema";
+import { createDefaultProcessDefinitions, runProcessDefinitions } from "processes/runner";
+import { RuntimeServices } from "runtime/services";
 import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
 import { createTaskMemory, TaskStatus, TaskType } from "tasks/model";
 
@@ -243,6 +247,95 @@ describe("bootstrap execution task assignment", () => {
 
     assert.equal(summary.assigned, 1);
     assert.deepEqual(creep.memory.task, createTaskMemory(TaskType.harvest, source.id, 274));
+  });
+});
+
+describe("bootstrap execution process registration", () => {
+  it("summarizes slot, spawn demand, task assignment, and blocked counts", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a"), createSource("source-b")],
+      controller: createController("controller-a"),
+      creeps: [createCreep("WorkerA", RoleName.worker, 0), createCreep("WorkerB", RoleName.worker, 50)]
+    });
+
+    const summary = runBootstrapExecution([context], memory, 280);
+
+    assert.deepEqual(summary, {
+      colonies: 1,
+      slots: 5,
+      spawnRequestsCreated: 5,
+      spawnRequestsDuplicate: 0,
+      tasksAssigned: 2,
+      blocked: 0
+    });
+  });
+
+  it("registers bootstrapExecution between strategyPlanning and creepRoles with an explainable message", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a")],
+      controller: createController("controller-a"),
+      creeps: [createCreep("WorkerA", RoleName.worker, 0)]
+    });
+    memory.colonies.W1N1 = {
+      roomName: "W1N1",
+      primary: true,
+      status: "ready",
+      intel: {
+        roomName: "W1N1",
+        lastSeenTick: 280,
+        lastRefreshTick: 280,
+        status: "ready",
+        missingReasons: [],
+        controllerId: "controller-a",
+        rcl: 1,
+        sourceIds: ["source-a"],
+        spawnIds: ["Spawn1-id"],
+        primary: true,
+        stage: "rcl1"
+      },
+      spawnQueue: [],
+      strategy: createDefaultProjectMemorySections().colonies.W1N1?.strategy ?? {
+        version: 1,
+        roomName: "W1N1",
+        stage: "rcl1",
+        status: "stale",
+        lastRunTick: 0,
+        nextRunTick: 0,
+        lastTrigger: "test",
+        signature: "",
+        priorities: [],
+        intents: [],
+        deferrals: [],
+        reasons: []
+      }
+    };
+
+    const definitions = createDefaultProcessDefinitions();
+    const results = runProcessDefinitions([context], {} as RuntimeServices, memory, {} as Game, 281, definitions);
+
+    assert.deepEqual(
+      definitions.map(definition => [definition.id, definition.priority]),
+      [
+        [ProcessName.colonyIntel, 10],
+        [ProcessName.strategyPlanning, 15],
+        [ProcessName.bootstrapExecution, 18],
+        [ProcessName.creepRoles, 20]
+      ]
+    );
+
+    const bootstrapResult = results.find(result => result.processId === ProcessName.bootstrapExecution);
+
+    assert.isDefined(bootstrapResult);
+    assert.include(bootstrapResult?.message, "bootstrap colonies=");
+    assert.include(bootstrapResult?.message, "slots=");
+    assert.include(bootstrapResult?.message, "spawn=");
+    assert.include(bootstrapResult?.message, "duplicate=");
+    assert.include(bootstrapResult?.message, "tasks=");
+    assert.include(bootstrapResult?.message, "blocked=");
   });
 });
 
