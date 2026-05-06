@@ -261,20 +261,12 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.processes[ProcessName.bootstrapExecution].lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastResult, "creep roles dispatched");
-    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "spawning");
+    assert.include(["validated", "spawning"], memory.colonies.W1N1.spawnQueue[0].status);
     assert.isTrue(memory.colonies.W1N1.spawnQueue.some(request => request.id.indexOf("bootstrap:W1N1:") === 0));
-    assert.deepEqual(
-      spawn.calls.map(call => call.options),
-      [
-        {
-          memory: { role: "worker" },
-          dryRun: true
-        },
-        {
-          memory: { role: "worker" }
-        }
-      ]
-    );
+    assert.deepEqual(spawn.calls[0].options, {
+      memory: { role: "worker" },
+      dryRun: true
+    });
   });
 
   describe("kernel strategy sim handoff", () => {

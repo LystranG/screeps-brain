@@ -116,6 +116,8 @@ function runSingleProcess(definition: ProcessDefinition, context: ProcessRunnerC
   const state = ensureProcessMemory(context.memory, definition);
 
   if (!state.enabled) {
+    state.lastStatus = "skipped";
+
     return {
       processId: definition.id,
       status: "skipped",
@@ -124,6 +126,8 @@ function runSingleProcess(definition: ProcessDefinition, context: ProcessRunnerC
   }
 
   if (state.nextRunTick > context.tick) {
+    state.lastStatus = "skipped";
+
     return {
       processId: definition.id,
       status: "skipped",
@@ -135,6 +139,7 @@ function runSingleProcess(definition: ProcessDefinition, context: ProcessRunnerC
     const result = definition.run(context);
 
     state.lastRunTick = context.tick;
+    state.lastStatus = result.status;
     state.lastResult = result.message;
     state.lastError = null;
     state.nextRunTick = context.tick + state.cadence;
@@ -147,6 +152,7 @@ function runSingleProcess(definition: ProcessDefinition, context: ProcessRunnerC
     const message = error instanceof Error ? error.message : "Unknown process failure";
 
     state.lastRunTick = context.tick;
+    state.lastStatus = "error";
     state.lastResult = null;
     state.lastError = message;
     state.nextRunTick = context.tick + state.cadence;

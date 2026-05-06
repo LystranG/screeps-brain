@@ -150,6 +150,7 @@ export interface ProcessMemory {
   cadence: number;
   nextRunTick: number;
   lastRunTick: number | null;
+  lastStatus?: "ok" | "skipped" | "error";
   lastResult: string | null;
   lastError: string | null;
 }

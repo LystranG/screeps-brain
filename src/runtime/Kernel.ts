@@ -8,7 +8,7 @@ import { flushRuntimeStats } from "stats/Stats";
 import { installConsoleCommands } from "commands/installer";
 import { runMemoryMigrations } from "memory/migrations";
 import { runSimBootstrap } from "environment/simBootstrap";
-import { runSpawnValidation } from "spawning/runner";
+import { runSpawnLifecycle } from "spawning/runner";
 
 export interface KernelStageFailure {
   stage: LifecycleStageName;
@@ -188,7 +188,7 @@ export class Kernel {
   private runSpawning(): void {
     const services = this.requireServices();
     const result = buildColonyContexts(Memory, Game, Game.time);
-    const spawnResult = runSpawnValidation(result.contexts, Memory, Game, Game.time);
+    const spawnResult = runSpawnLifecycle(result.contexts, Memory, Game, Game.time);
 
     if (spawnResult.status === "error") {
       services.logger.error("kernel:spawning", `${spawnResult.requestId ?? "unknown"}: ${spawnResult.reason}`);
