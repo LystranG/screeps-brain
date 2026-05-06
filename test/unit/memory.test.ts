@@ -46,7 +46,7 @@ describe("memory migrations", () => {
     const result = runMemoryMigrations(memory);
 
     assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
-    assert.equal(memory.version, 4);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
     assert.deepEqual(memory.config.strategy, {
       mode: "manual",
       planningCadence: 50,
@@ -559,8 +559,8 @@ describe("memory migrations", () => {
     const result = runMemoryMigrations(memory);
 
     assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
-    assert.equal(memory.version, 4);
-    assert.equal(memory.runtime.lastMigration, 4);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
+    assert.equal(memory.runtime.lastMigration, CURRENT_MEMORY_VERSION);
     assert.deepEqual(memory.config.strategy, {
       mode: "manual",
       planningCadence: 50,
@@ -575,6 +575,121 @@ describe("memory migrations", () => {
     assert.equal(memory.colonies.W1N1.strategy.status, "stale");
     assert.equal(memory.colonies.W1N1.strategy.lastTrigger, "migration");
     assert.include(memory.colonies.W1N1.strategy.reasons, "strategy pending evaluation");
+  });
+
+  it("migrateToVersion5 repairs v4 spawn lifecycle fields without deleting validated requests", () => {
+    const memory = {
+      version: 4,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: 4,
+        migrationError: null
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W1N1",
+          intelRefreshCadence: 50
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 42,
+            lastRefreshTick: 40,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 1,
+            sourceIds: ["source1"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl1"
+          },
+          spawnQueue: [
+            {
+              id: "spawn-worker-validated",
+              roomName: "W1N1",
+              role: "worker",
+              priority: 2,
+              body: ["work", "carry", "move"],
+              memory: {
+                role: "worker"
+              },
+              reason: "already dry-run validated",
+              requestedTick: 40,
+              status: "validated",
+              attempts: 0,
+              lastError: null
+            }
+          ],
+          strategy: {
+            version: 1,
+            roomName: "W1N1",
+            stage: "rcl1",
+            status: "fresh",
+            lastRunTick: 40,
+            nextRunTick: 90,
+            lastTrigger: "state-change",
+            signature: "sig",
+            priorities: ["upgrade"],
+            intents: [],
+            deferrals: [],
+            reasons: ["ready"]
+          }
+        }
+      },
+      processes: {
+        "process-1": {
+          id: "process-1",
+          name: "strategyPlanning",
+          enabled: true,
+          priority: 15,
+          cadence: 50,
+          nextRunTick: 90,
+          lastRunTick: 40,
+          lastResult: "ok",
+          lastError: null
+        }
+      },
+      creeps: {
+        worker1: {
+          role: "worker"
+        }
+      }
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+    const request = memory.colonies.W1N1.spawnQueue[0];
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.version, 5);
+    assert.equal(memory.runtime.lastMigration, 5);
+    assert.equal(request.id, "spawn-worker-validated");
+    assert.equal(request.status, "validated");
+    assert.equal(request.lastTriedTick, null);
+    assert.equal(request.spawnName, null);
+    assert.equal(request.creepName, null);
+    assert.equal(request.completedTick, null);
+    assert.deepEqual(memory.processes["process-1"] as unknown, {
+      id: "process-1",
+      name: "strategyPlanning",
+      enabled: true,
+      priority: 15,
+      cadence: 50,
+      nextRunTick: 90,
+      lastRunTick: 40,
+      lastResult: "ok",
+      lastError: null
+    });
+    assert.deepEqual(memory.creeps.worker1, { role: "worker" });
   });
 
   it("repairs current-version colony records to safe degraded defaults", () => {
@@ -608,6 +723,82 @@ describe("memory migrations", () => {
     assert.isArray(memory.colonies.W2N2.intel.missingReasons);
     assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, []);
     assert.isTrue(memory.colonies.W2N2.primary);
+  });
+
+  it("repairs current-version spawn queue lifecycle fields with JSON-safe defaults", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W1N1"
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 30,
+            lastRefreshTick: 30,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 1,
+            sourceIds: ["source1"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl1"
+          },
+          spawnQueue: [
+            {
+              id: "partial-request",
+              roomName: "W1N1",
+              role: "upgrader",
+              priority: 4,
+              body: ["work", "carry", "move"],
+              memory: {
+                role: "upgrader"
+              },
+              reason: "partial current memory",
+              requestedTick: 30,
+              status: "queued",
+              attempts: 1,
+              lastError: "-6"
+            }
+          ]
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.deepEqual(memory.colonies.W1N1.spawnQueue[0], {
+      id: "partial-request",
+      roomName: "W1N1",
+      role: "upgrader",
+      priority: 4,
+      body: ["work", "carry", "move"],
+      memory: {
+        role: "upgrader"
+      },
+      reason: "partial current memory",
+      requestedTick: 30,
+      status: "queued",
+      attempts: 1,
+      lastError: "-6",
+      lastTriedTick: null,
+      spawnName: null,
+      creepName: null,
+      completedTick: null
+    });
   });
 
   it("repairs current-version strategy gates and missing colony strategy plans", () => {
