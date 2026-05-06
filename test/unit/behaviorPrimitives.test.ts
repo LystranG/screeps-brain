@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import { ColonyContext } from "colony/types";
+import { ProcessName } from "constants/processes";
 import { RoleName } from "constants/roles";
 import { ProcessMemory, TaskMemory } from "memory/schema";
 import { ProcessDefinition } from "processes/types";
@@ -242,11 +243,14 @@ describe("behavior primitives process runner", () => {
 
     assert.deepEqual(
       definitions.map((definition: { id: string }) => definition.id),
-      ["colonyIntel", "creepRoles"]
+      [ProcessName.colonyIntel, ProcessName.strategyPlanning, ProcessName.creepRoles]
     );
+    const creepRolesResult = results.find(result => result.processId === ProcessName.creepRoles);
+
     assert.deepEqual(calls, [RoleName.worker, "miner"]);
-    assert.equal(results[1].status, "ok");
-    assert.include(results[1].message, "unknown role: miner");
+    assert.isDefined(creepRolesResult);
+    assert.equal(creepRolesResult?.status, "ok");
+    assert.include(creepRolesResult?.message, "unknown role: miner");
   });
 });
 
