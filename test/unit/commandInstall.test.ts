@@ -39,7 +39,7 @@ describe("command install|registry assembly", () => {
     assert.deepEqual(namespaces, expectedNamespaces);
   });
 
-  it("renders root help with future namespace dependency notes", () => {
+  it("renders root help with active strategy inspection commands", () => {
     const registry = createDefaultCommandRegistry();
     const help = renderRootHelp(registry.listNamespaces());
 
@@ -50,18 +50,20 @@ describe("command install|registry assembly", () => {
     assert.include(help, "cmd.colony.help()");
     assert.include(help, "cmd.strategy.help()");
     assert.include(help, "cmd.spawn.help()");
-    assert.include(help, "requires strategy planning phase");
+    assert.notInclude(help, "requires strategy planning phase");
     assert.include(help, "Read-only colony context inspection commands");
+    assert.include(help, "Read-only strategy planning inspection commands");
     assert.include(help, "Read-only spawn queue and dry-run inspection commands");
   });
 
-  it("executes representative handlers from implemented and future namespaces", () => {
+  it("executes representative handlers from implemented namespaces", () => {
     const memory = createCommandMemory();
     const registry = createDefaultCommandRegistry();
     const context = createContext(memory);
 
     assert.equal(registry.execute(["env", "status"], [], context).status, "OK");
     assert.equal(registry.execute(["config", "logLevel"], ["debug"], context).status, "OK");
+    assert.equal(registry.execute(["strategy", "status"], [], context).status, "OK");
     assert.equal(registry.execute(["spawn", "status"], [], context).status, "OK");
     assert.equal(memory.config.observability.logLevel, "debug");
   });
@@ -87,6 +89,12 @@ describe("command install|global cmd", () => {
       debug: {
         help(): string;
         dump(path: string, maxLength?: number): string;
+      };
+      strategy: {
+        explain(room?: string): string;
+        help(): string;
+        plan(room?: string): string;
+        status(): string;
       };
       spawn: {
         help(): string;
@@ -139,10 +147,14 @@ describe("command install|global cmd", () => {
     assert.isString(cmd.sim.guidance());
     assert.isString(cmd.config.logLevel("debug"));
     assert.isString(cmd.debug.dump("Memory.config", 200));
+    assert.isString(cmd.strategy.status());
+    assert.isString(cmd.strategy.plan());
+    assert.isString(cmd.strategy.explain());
     assert.include(cmd.help(), "cmd.env.help()");
     assert.include(cmd.env.status(), "OK env status:");
     assert.include(cmd.config.logLevel("debug"), "OK logLevel: debug -> debug");
     assert.include(cmd.debug.dump("Memory.config", 200), "OK debug dump Memory.config:");
+    assert.include(cmd.strategy.status(), "OK strategy status:");
     assert.include(cmd.spawn.status(), "OK spawn status:");
   });
 

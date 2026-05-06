@@ -196,58 +196,11 @@ describe("command inspection|debug|dump", () => {
   });
 });
 
-describe("command inspection|future|blocked", () => {
-  function createInspectionMemory(): Memory {
-    return {
-      ...createDefaultProjectMemorySections(),
-      creeps: {}
-    } as Memory;
-  }
-
-  function createContext(memory: Memory): CommandContext {
-    return {
-      game: createMockGame() as unknown as Game,
-      memory
-    };
-  }
-
-  it("defines strategy as the remaining future/blocked read-only namespace", () => {
+describe("command inspection|future", () => {
+  it("has no remaining future command namespaces after strategy activation", () => {
     const namespaces = createFutureNamespaces();
 
-    assert.deepEqual(
-      namespaces.map(namespace => namespace.name),
-      ["strategy"]
-    );
-    assert.include(renderNamespaceHelp(namespaces[0]), "cmd.strategy.status()");
-    assert.include(renderNamespaceHelp(namespaces[0]), "requires strategy planning phase");
-
-    for (const namespace of namespaces) {
-      const help = renderNamespaceHelp(namespace);
-
-      assert.equal(namespace.effect, CommandEffect.futureBlocked);
-      assert.lengthOf(namespace.commands, 1);
-      assert.equal(namespace.commands[0].effect, CommandEffect.futureBlocked);
-      assert.include(help, "future/blocked");
-      assert.include(help, `cmd.${namespace.name}.status()`);
-    }
-  });
-
-  it("returns FUTURE dependency messages without queueing requests", () => {
-    const memory = createInspectionMemory();
-    const namespaces = createFutureNamespaces();
-    const results = namespaces.map(namespace => namespace.commands[0].run([], createContext(memory)));
-
-    assert.deepEqual(results, [
-      {
-        ok: false,
-        status: "FUTURE",
-        message: "strategy commands require strategy planning phase; no request queued",
-        effect: CommandEffect.futureBlocked
-      }
-    ]);
-    assert.deepEqual(memory.commands.queue, []);
-    assert.deepEqual(memory.commands.history, []);
-    assert.equal(formatCommandResult(results[0]), "FUTURE strategy commands require strategy planning phase; no request queued");
+    assert.deepEqual(namespaces, []);
   });
 });
 
@@ -753,6 +706,20 @@ describe("command inspection|strategy", () => {
     assert.include(explain.message, "deferRemoteMining:gated@strategy.allowRemoteMining");
     assert.equal(missingPlan.status, "ERR");
     assert.include(missingPlan.message, "strategy plan not found for room W9N9");
+  });
+
+  it("registers strategy as an active namespace instead of future placeholder", () => {
+    const memory = createInspectionMemory();
+    const registry = createDefaultCommandRegistry();
+    const futureNames = createFutureNamespaces().map(namespace => namespace.name);
+    const context = createContext(memory);
+
+    assert.isDefined(registry.getNamespace("strategy"));
+    assert.notInclude(futureNames, "strategy");
+    assert.include(renderNamespaceHelp(registry.getNamespace("strategy")!), "cmd.strategy.plan(room?)");
+    assert.equal(registry.execute(["strategy", "status"], [], context).status, "OK");
+    assert.equal(registry.execute(["strategy", "plan"], [], context).status, "OK");
+    assert.equal(registry.execute(["strategy", "explain"], [], context).status, "OK");
   });
 });
 
