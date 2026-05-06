@@ -4,7 +4,7 @@ import { MemoryKey } from "constants/memory";
 import { ProcessName } from "constants/processes";
 import { RoleName } from "constants/roles";
 import { CpuAvailability, LogLevel, LoggerNamespace, RuntimeEnvironment, ShardName } from "constants/runtime";
-import { StrategyMode } from "constants/strategy";
+import { StrategyIntentStatus, StrategyIntentType, StrategyMode } from "constants/strategy";
 import { validateRoomName } from "validation/roomName";
 import { validateLogLevel, validateRuntimeEnvironment, validateShardName } from "validation/runtime";
 import { createMockGame } from "./mock";
@@ -51,6 +51,29 @@ describe("constants|validation", () => {
     assert.equal(processNames.colonyIntel, "colonyIntel");
     assert.equal(processNames.creepRoles, "creepRoles");
     assert.equal(processNames.spawnValidation, "spawnValidation");
+  });
+
+  it("exposes Phase 5 strategy intent and planning constants", () => {
+    assert.equal(ProcessName.strategyPlanning, "strategyPlanning");
+
+    assert.deepEqual(StrategyIntentType, {
+      maintainWorkerCoverage: "maintainWorkerCoverage",
+      prioritizeUpgrade: "prioritizeUpgrade",
+      allowBasicConstruction: "allowBasicConstruction",
+      repairCriticalStructures: "repairCriticalStructures",
+      defenseWatch: "defenseWatch",
+      deferExpansion: "deferExpansion",
+      deferRemoteMining: "deferRemoteMining",
+      deferMarket: "deferMarket",
+      deferWarfare: "deferWarfare",
+      deferLargeFortification: "deferLargeFortification"
+    });
+
+    assert.deepEqual(StrategyIntentStatus, {
+      allowed: "allowed",
+      gated: "gated",
+      deferred: "deferred"
+    });
   });
 
   it("accepts any non-empty room name string in Phase 1", () => {
