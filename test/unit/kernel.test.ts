@@ -1,9 +1,11 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
 import { ProcessName } from "constants/processes";
+import { RoleName } from "constants/roles";
 import { RuntimeEnvironment } from "constants/runtime";
 import { CURRENT_MEMORY_VERSION, createDefaultProjectMemorySections, createDefaultStrategyPlanMemory } from "memory/schema";
 import { createSpawnRequest } from "spawning/queue";
+import { createTaskMemory, TaskType } from "tasks/model";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
 import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
 import { createMockGame, createMockMemory, createMockRoom, mockGame, mockMemory } from "./mock";
@@ -257,7 +259,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.processes.colonyIntel.lastRunTick, 200);
     assert.equal(memory.processes[ProcessName.strategyPlanning].lastRunTick, 200);
     assert.include(memory.processes[ProcessName.strategyPlanning].lastResult ?? "", "strategy refreshed=");
-    assert.equal((memory.processes[ProcessName.bootstrapExecution] as ProcessMemoryWithStatus).lastStatus, "ok");
+    assert.equal(memory.processes[ProcessName.bootstrapExecution].lastStatus, "ok");
     assert.equal(memory.processes[ProcessName.bootstrapExecution].lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastResult, "creep roles dispatched");
@@ -423,6 +425,147 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     });
   });
 
+  describe("kernel bootstrap matrix", () => {
+    it("normal ready room creates bootstrap queue demand", () => {
+      const { game, memory, spawn } = setupKernelBootstrapRoom({ shardName: "shard0", tick: 300 });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.equal(memory.colonies.W1N1.status, "ready");
+      assert.equal(memory.processes[ProcessName.bootstrapExecution].lastStatus, "ok");
+      assert.isTrue(memory.colonies.W1N1.spawnQueue.some(request => request.id.indexOf("bootstrap:W1N1:") === 0));
+      assert.include(["validated", "spawning"], memory.colonies.W1N1.spawnQueue[0].status);
+      assert.deepEqual(game.creeps, {});
+      assert.deepEqual(spawn.calls.map(call => call.options.dryRun), [true]);
+    });
+
+    it("sim ready room uses normal bootstrap process", () => {
+      const { memory } = setupKernelBootstrapRoom({ shardName: "sim", tick: 310 });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.isTrue(memory.runtime.sim.bootstrap.ready);
+      assert.equal(memory.colonies.W1N1.status, "ready");
+      assert.equal(memory.processes[ProcessName.bootstrapExecution].lastStatus, "ok");
+      assert.isTrue(memory.colonies.W1N1.spawnQueue.some(request => request.id.indexOf("bootstrap:W1N1:") === 0));
+      assert.deepEqual(Object.keys(memory.runtime.sim.guidance), ["missing-creep"]);
+    });
+
+    it("missing spawn records degraded context without queue demand", () => {
+      const { memory } = setupKernelBootstrapRoom({ shardName: "shard0", tick: 320, includeSpawn: false });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.equal(memory.colonies.W1N1.status, "degraded");
+      assert.include(memory.colonies.W1N1.intel.missingReasons, "missing spawn");
+      assert.lengthOf(memory.colonies.W1N1.spawnQueue, 0);
+    });
+
+    it("missing source records guidance without harvest demand", () => {
+      const { memory } = setupKernelBootstrapRoom({ shardName: "sim", tick: 330, includeSource: false });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.include(memory.colonies.W1N1.intel.missingReasons, "missing source");
+      assert.include(Object.keys(memory.runtime.sim.guidance), "missing-source");
+      assert.isFalse(memory.colonies.W1N1.spawnQueue.some(request => request.reason.indexOf("harvest source") >= 0));
+    });
+
+    it("missing controller records guidance without upgrade demand", () => {
+      const { memory } = setupKernelBootstrapRoom({ shardName: "sim", tick: 335, includeController: false });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.include(memory.colonies.W1N1.intel.missingReasons, "missing controller");
+      assert.include(Object.keys(memory.runtime.sim.guidance), "missing-controller");
+      assert.isFalse(memory.colonies.W1N1.spawnQueue.some(request => request.reason.indexOf("upgrade controller") >= 0));
+    });
+
+    it("missing creep creates spawn demand", () => {
+      const { memory } = setupKernelBootstrapRoom({ shardName: "shard0", tick: 340 });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.lengthOf(Object.keys(memory.creeps), 0);
+      assert.isAtLeast(memory.colonies.W1N1.spawnQueue.length, 1);
+      assert.isTrue(memory.colonies.W1N1.spawnQueue.every(request => request.id.indexOf("bootstrap:W1N1:") === 0));
+    });
+
+    it("ready room worker executes assigned harvest through creepRoles", () => {
+      const source = createKernelSource("source-a");
+      const creep = createKernelActionCreep("Worker1", RoleName.worker, 0, 50);
+      creep.memory.task = createTaskMemory(TaskType.harvest, source.id, 350);
+      setupKernelBootstrapRoom({
+        shardName: "shard0",
+        tick: 351,
+        sources: [source],
+        creeps: [creep]
+      });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.deepEqual(creep.actionCalls.map(call => call.action), ["harvest"]);
+      assert.equal(creep.memory.task.status, "running");
+      assert.equal(Memory.processes[ProcessName.creepRoles].lastStatus, "ok");
+    });
+
+    it("ready room worker executes assigned upgrade through creepRoles", () => {
+      const controller = createKernelController("controller-a");
+      const creep = createKernelActionCreep("Worker1", RoleName.worker, 50, 0);
+      creep.memory.task = createTaskMemory(TaskType.upgrade, controller.id, 355);
+      setupKernelBootstrapRoom({
+        shardName: "shard0",
+        tick: 356,
+        controller,
+        creeps: [creep]
+      });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.deepEqual(creep.actionCalls.map(call => call.action), ["upgradeController"]);
+      assert.equal(creep.memory.task.status, "running");
+      assert.equal(Memory.processes[ProcessName.creepRoles].lastStatus, "ok");
+    });
+
+    it("spawning request completes only after Game.creeps contains creepName", () => {
+      const request = createSpawnRequest({
+        id: "bootstrap:W1N1:source:source-a:0:worker",
+        roomName: "W1N1",
+        role: RoleName.worker,
+        priority: 20,
+        body: ["work", "carry", "move"],
+        memory: { role: RoleName.worker } as CreepMemory,
+        reason: "harvest source source-a",
+        requestedTick: 360
+      });
+      request.status = "spawning";
+      request.spawnName = "SpawnPrimary";
+      request.creepName = "WorkerPending";
+
+      const setup = setupKernelBootstrapRoom({ shardName: "shard0", tick: 361, spawnQueue: [request] });
+
+      new Kernel().run();
+      assert.equal(setup.memory.colonies.W1N1.spawnQueue[0].status, "spawning");
+
+      setup.game.time = 362;
+      setup.game.creeps.WorkerPending = createKernelActionCreep("WorkerPending", RoleName.worker, 0, 50);
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.equal(setup.memory.colonies.W1N1.spawnQueue[0].status, "spawned");
+      assert.equal(setup.memory.colonies.W1N1.spawnQueue[0].completedTick, 362);
+    });
+  });
+
   it("records a failed stage sample and still reaches later lifecycle stages", () => {
     consoleLog = sinon.stub(console, "log");
     const game = mockGame();
@@ -548,8 +691,31 @@ interface KernelSpawn extends StructureSpawn {
   }>;
 }
 
-interface ProcessMemoryWithStatus {
-  lastStatus?: string;
+interface KernelActionCall {
+  action: "harvest" | "upgradeController" | "moveTo";
+  target: { id?: string };
+}
+
+interface KernelActionCreep extends Creep {
+  actionCalls: KernelActionCall[];
+}
+
+interface KernelBootstrapRoomOptions {
+  shardName: string;
+  tick: number;
+  includeSpawn?: boolean;
+  includeSource?: boolean;
+  includeController?: boolean;
+  sources?: Source[];
+  controller?: StructureController;
+  creeps?: Creep[];
+  spawnQueue?: ReturnType<typeof createSpawnRequest>[];
+}
+
+interface KernelBootstrapRoomSetup {
+  game: ReturnType<typeof createMockGame>;
+  memory: Memory;
+  spawn: KernelSpawn;
 }
 
 function createKernelSpawn(name: string): KernelSpawn {
@@ -570,4 +736,128 @@ function createKernelSpawn(name: string): KernelSpawn {
       return OK;
     }
   } as KernelSpawn;
+}
+
+function setupKernelBootstrapRoom(options: KernelBootstrapRoomOptions): KernelBootstrapRoomSetup {
+  const game = mockGame();
+  const memory = mockMemory() as Memory;
+  const spawn = createKernelSpawn("SpawnPrimary");
+  const includeSpawn = options.includeSpawn !== false;
+  const includeSource = options.includeSource !== false;
+  const includeController = options.includeController !== false;
+  const sources = options.sources ?? (includeSource ? [createKernelSource("source-a")] : []);
+  const controller = options.controller ?? createKernelController("controller-a");
+  const creeps = options.creeps ?? [];
+
+  game.shard.name = options.shardName;
+  game.time = options.tick;
+  game.rooms = {
+    W1N1: createMockRoom({
+      name: "W1N1",
+      controller: includeController ? controller : undefined,
+      spawns: includeSpawn ? [spawn] : [],
+      sources,
+      creeps,
+      constructionSites: [],
+      hostiles: [],
+      energyAvailable: includeSpawn ? 300 : 0,
+      energyCapacityAvailable: includeSpawn ? 300 : 0
+    })
+  };
+  game.spawns = includeSpawn ? { SpawnPrimary: spawn } : {};
+  game.creeps = creeps.reduce((indexedCreeps, creep) => {
+    indexedCreeps[creep.name] = creep;
+
+    return indexedCreeps;
+  }, {} as ReturnType<typeof createMockGame>["creeps"]);
+
+  Object.assign(memory, {
+    ...createDefaultProjectMemorySections(),
+    creeps: {}
+  });
+
+  if (options.spawnQueue) {
+    memory.colonies.W1N1 = {
+      roomName: "W1N1",
+      primary: true,
+      status: "ready",
+      intel: {
+        roomName: "W1N1",
+        lastSeenTick: options.tick - 1,
+        lastRefreshTick: options.tick - 1,
+        status: "ready",
+        missingReasons: [],
+        controllerId: "controller-a",
+        rcl: 1,
+        sourceIds: sources.map(source => source.id),
+        spawnIds: includeSpawn ? [spawn.id] : [],
+        primary: true,
+        stage: "rcl1"
+      },
+      spawnQueue: options.spawnQueue,
+      strategy: createDefaultStrategyPlanMemory("W1N1", "kernel-bootstrap-matrix")
+    };
+  }
+
+  return { game, memory, spawn };
+}
+
+function createKernelSource(id: string): Source {
+  return {
+    id,
+    pos: {
+      roomName: "W1N1",
+      x: 10,
+      y: 20
+    }
+  } as Source;
+}
+
+function createKernelController(id: string): StructureController {
+  return {
+    id,
+    my: true,
+    level: 1,
+    pos: {
+      roomName: "W1N1",
+      x: 20,
+      y: 20
+    }
+  } as StructureController;
+}
+
+function createKernelActionCreep(name: string, role: RoleName, usedEnergy: number, freeEnergy: number): KernelActionCreep {
+  const actionCalls: KernelActionCall[] = [];
+
+  return {
+    name,
+    memory: {
+      role
+    },
+    pos: {
+      findClosestByRange: (targets: Source[]): Source | null => targets[0] ?? null
+    },
+    store: {
+      getUsedCapacity: (resource?: ResourceConstant): number =>
+        resource === undefined || resource === RESOURCE_ENERGY ? usedEnergy : 0,
+      getFreeCapacity: (resource?: ResourceConstant): number =>
+        resource === undefined || resource === RESOURCE_ENERGY ? freeEnergy : 0
+    },
+    harvest(target: Source): ScreepsReturnCode {
+      actionCalls.push({ action: "harvest", target });
+
+      return OK;
+    },
+    upgradeController(target: StructureController): ScreepsReturnCode {
+      actionCalls.push({ action: "upgradeController", target });
+
+      return OK;
+    },
+    moveTo(target: RoomPosition | { pos: RoomPosition }): CreepMoveReturnCode | ERR_NO_PATH | ERR_INVALID_TARGET {
+      actionCalls.push({ action: "moveTo", target: target as { id?: string } });
+
+      return OK;
+    },
+    actionCalls
+  } as unknown as KernelActionCreep;
 }

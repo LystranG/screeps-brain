@@ -73,8 +73,9 @@ export function createMockGame(): {
   spawns: { [spawnName: string]: any };
   flags: { [flagName: string]: any };
   time: number;
+  getObjectById: (id: string) => any | null;
 } {
-  return {
+  const game = {
     creeps: {},
     cpu: {
       getUsed: () => 0,
@@ -87,8 +88,39 @@ export function createMockGame(): {
     rooms: {},
     spawns: {},
     flags: {},
-    time: 12345
+    time: 12345,
+    getObjectById(id: string): any | null {
+      const currentGame = mockGame();
+      const directCollections = [currentGame.creeps, currentGame.spawns];
+
+      for (const collection of directCollections) {
+        const direct = collection[id];
+
+        if (direct !== undefined) {
+          return direct;
+        }
+      }
+
+      for (const room of Object.values(currentGame.rooms)) {
+        const roomValue = room as any;
+        const candidates = [
+          roomValue.controller,
+          ...(roomValue.find(FIND_SOURCES) ?? []),
+          ...(roomValue.find(FIND_MY_SPAWNS) ?? []),
+          ...(roomValue.find(FIND_MY_CREEPS) ?? [])
+        ];
+        const found = candidates.find(candidate => candidate?.id === id);
+
+        if (found !== undefined) {
+          return found;
+        }
+      }
+
+      return null;
+    }
   };
+
+  return game;
 }
 
 // Memory mock 只提供当前测试需要的最小结构，其余 section 由迁移测试补齐。
