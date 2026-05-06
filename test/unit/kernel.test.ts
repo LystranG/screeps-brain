@@ -266,82 +266,84 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     });
   });
 
-  it("runs sim-ready rooms through runColoniesAndProcesses and persists strategy summaries", () => {
-    const game = mockGame();
-    const memory = mockMemory() as Memory;
-    const spawn = createKernelSpawn("SpawnSim");
+  describe("kernel strategy sim handoff", () => {
+    it("runs sim-ready rooms through runColoniesAndProcesses and persists summaries", () => {
+      const game = mockGame();
+      const memory = mockMemory() as Memory;
+      const spawn = createKernelSpawn("SpawnSim");
 
-    game.shard.name = "sim";
-    game.time = 250;
-    game.rooms = {
-      W9N9: createMockRoom({
-        name: "W9N9",
-        controller: { id: "controller-sim-ready", my: true, level: 1 },
-        spawns: [spawn],
-        sources: [{ id: "source-sim-a" }],
-        creeps: [],
-        constructionSites: [],
-        hostiles: [],
-        energyAvailable: 300,
-        energyCapacityAvailable: 300
-      })
-    };
-    game.spawns = {
-      SpawnSim: spawn
-    };
+      game.shard.name = "sim";
+      game.time = 250;
+      game.rooms = {
+        W9N9: createMockRoom({
+          name: "W9N9",
+          controller: { id: "controller-sim-ready", my: true, level: 1 },
+          spawns: [spawn],
+          sources: [{ id: "source-sim-a" }],
+          creeps: [],
+          constructionSites: [],
+          hostiles: [],
+          energyAvailable: 300,
+          energyCapacityAvailable: 300
+        })
+      };
+      game.spawns = {
+        SpawnSim: spawn
+      };
 
-    Object.assign(memory, {
-      ...createDefaultProjectMemorySections(),
-      creeps: {}
+      Object.assign(memory, {
+        ...createDefaultProjectMemorySections(),
+        creeps: {}
+      });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.include(result.executedStages, "runColoniesAndProcesses");
+      assert.isTrue(memory.runtime.sim.bootstrap.ready);
+      assert.equal(memory.colonies.W9N9.status, "ready");
+      assert.equal(memory.colonies.W9N9.strategy.lastRunTick, 250);
+      assert.equal(memory.processes[ProcessName.strategyPlanning].lastResult, "strategy refreshed=1 skipped=0 errors=0");
+      assert.lengthOf(memory.colonies.W9N9.spawnQueue, 0);
     });
 
-    const result = new Kernel().run();
+    it("runs degraded sim rooms through normal path without creating spawn queue entries", () => {
+      const game = mockGame();
+      const memory = mockMemory() as Memory;
 
-    assert.isTrue(result.ok);
-    assert.include(result.executedStages, "runColoniesAndProcesses");
-    assert.isTrue(memory.runtime.sim.bootstrap.ready);
-    assert.equal(memory.colonies.W9N9.status, "ready");
-    assert.equal(memory.colonies.W9N9.strategy.lastRunTick, 250);
-    assert.equal(memory.processes[ProcessName.strategyPlanning].lastResult, "strategy refreshed=1 skipped=0 errors=0");
-    assert.lengthOf(memory.colonies.W9N9.spawnQueue, 0);
-  });
+      game.shard.name = "sim";
+      game.time = 260;
+      game.rooms = {
+        W8N8: createMockRoom({
+          name: "W8N8",
+          controller: { id: "controller-sim-degraded", my: true, level: 1 },
+          spawns: [],
+          sources: [],
+          creeps: [],
+          constructionSites: [],
+          hostiles: [],
+          energyAvailable: 0,
+          energyCapacityAvailable: 0
+        })
+      };
+      game.spawns = {};
 
-  it("runs degraded sim rooms through normal strategy path without creating spawn queue entries", () => {
-    const game = mockGame();
-    const memory = mockMemory() as Memory;
+      Object.assign(memory, {
+        ...createDefaultProjectMemorySections(),
+        creeps: {}
+      });
 
-    game.shard.name = "sim";
-    game.time = 260;
-    game.rooms = {
-      W8N8: createMockRoom({
-        name: "W8N8",
-        controller: { id: "controller-sim-degraded", my: true, level: 1 },
-        spawns: [],
-        sources: [],
-        creeps: [],
-        constructionSites: [],
-        hostiles: [],
-        energyAvailable: 0,
-        energyCapacityAvailable: 0
-      })
-    };
-    game.spawns = {};
+      const result = new Kernel().run();
 
-    Object.assign(memory, {
-      ...createDefaultProjectMemorySections(),
-      creeps: {}
+      assert.isTrue(result.ok);
+      assert.include(result.executedStages, "runColoniesAndProcesses");
+      assert.isFalse(memory.runtime.sim.bootstrap.ready);
+      assert.deepEqual(memory.colonies.W8N8.intel.missingReasons, ["missing spawn", "missing source"]);
+      assert.equal(memory.colonies.W8N8.strategy.lastRunTick, 260);
+      assert.equal(memory.colonies.W8N8.strategy.stage, "degraded");
+      assert.include(memory.colonies.W8N8.strategy.reasons, "repair: degraded colony missing spawn, missing source");
+      assert.lengthOf(memory.colonies.W8N8.spawnQueue, 0);
     });
-
-    const result = new Kernel().run();
-
-    assert.isTrue(result.ok);
-    assert.include(result.executedStages, "runColoniesAndProcesses");
-    assert.isFalse(memory.runtime.sim.bootstrap.ready);
-    assert.deepEqual(memory.colonies.W8N8.intel.missingReasons, ["missing spawn", "missing source"]);
-    assert.equal(memory.colonies.W8N8.strategy.lastRunTick, 260);
-    assert.equal(memory.colonies.W8N8.strategy.stage, "degraded");
-    assert.include(memory.colonies.W8N8.strategy.reasons, "repair: degraded colony missing spawn, missing source");
-    assert.lengthOf(memory.colonies.W8N8.spawnQueue, 0);
   });
 
   it("records a failed stage sample and still reaches later lifecycle stages", () => {
