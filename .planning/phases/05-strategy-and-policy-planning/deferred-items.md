@@ -8,3 +8,8 @@
   - `src/memory/schema.ts` and `src/strategy/runner.ts`: import ordering warnings.
 - Plan 05-04 fixed its own added lint warning in `src/commands/namespaces/strategy.ts`.
 - Plan 05-05 already includes the full `npm run lint` gate and should address these Phase 5-wide lint issues there.
+
+## 2026-05-06 - Plan 05-05 Resolution
+
+- Resolved the deferred Phase 05 lint failures in `src/strategy/planner.ts`, `src/strategy/policy.ts`, `src/strategy/runner.ts`, `src/memory/schema.ts`, and `src/commands/namespaces/strategy.ts`.
+- Verified `rtk npm run lint`, `rtk npm test`, `rtk npm run build`, the focused Phase 5 test grep, the non-execution boundary grep, and `rtk graphify update .`.

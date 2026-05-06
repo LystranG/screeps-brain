@@ -14,7 +14,7 @@ This roadmap builds lystran-brain from the existing Screeps TypeScript starter i
 | 2 | Observability and Environment Infrastructure | Add logger, profiler, stats, environment detection, and sim bootstrap infrastructure. | MEM-04, OBS-01, OBS-02, OBS-03, OBS-04, ENV-01, ENV-02, SIM-01, SIM-02, SIM-03, TEST-02, TEST-04 |
 | 3 | Console Command System | Complete 2026-05-05 — safe manual control and inspection through a scalable console command tree verified. | CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06, TEST-03 |
 | 4 | Colony and Behavior Primitives | Complete 2026-05-05 — colony context, room intel, process, role, task, spawn queue, body builder, read-only commands, and kernel wiring verified. | COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05 |
-| 5 | Strategy and Policy Planning | In progress 2026-05-06 — 4/5 plans complete; strategy process, sim handoff, and active read-only strategy commands verified. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
+| 5 | Strategy and Policy Planning | Complete 2026-05-06 — strategy planning, policy gates, read-only inspection, sim handoff, and full verification gates passed. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
 | 6 | Minimal RCL1 Bootstrap Loop | Use the foundation to maintain workers, harvest energy, and upgrade a controller in sim or a normal room. | BOOT-01, BOOT-02, BOOT-03, BOOT-04 |
 
 ## Phase Details
@@ -124,11 +124,20 @@ Plans:
 
 ## Phase 5: Strategy and Policy Planning
 
-**Status:** In Progress — 4/5 plans complete as of 2026-05-06.
+**Status:** Complete — full verification gates passed 2026-05-06.
 
 **Goal:** Add explainable long-term decision support while preserving human control over expensive or risky actions.
 
 **Requirements:** STR-01, STR-02, STR-03, STR-04, SIM-04
+
+**Plans:** 5/5 plans complete
+
+Plans:
+- [x] 05-01-PLAN.md — Add strategy constants, v4 Memory policy gates, and per-colony strategy summaries.
+- [x] 05-02-PLAN.md — Build pure strategy planner with policy-gated high-risk deferrals and cadence/signature refresh.
+- [x] 05-03-PLAN.md — Wire strategy planning through the process/kernel path and verify sim handoff.
+- [x] 05-04-PLAN.md — Activate read-only `cmd.strategy` inspection commands.
+- [x] 05-05-PLAN.md — Close focused/full test, lint, build, non-execution boundary, and graphify gates.
 
 **Success Criteria:**
 1. Strategy planner evaluates colony stage and priorities on a cadence, not every tick.
@@ -222,4 +231,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-05-03*
-*Last updated: 2026-05-05 after Phase 2 verification*
+*Last updated: 2026-05-06 after Phase 5 verification*
