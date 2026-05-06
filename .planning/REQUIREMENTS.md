@@ -39,7 +39,7 @@
 - [x] **SIM-01**: In a fresh sim environment, the system initializes memory and records idempotent sim bootstrap state.
 - [x] **SIM-02**: Sim bootstrap performs only API-permitted setup, such as memory defaults, flags, or construction sites where possible.
 - [x] **SIM-03**: When a sim environment lacks sources, spawns, or initial creeps that bot runtime code cannot create, the system reports clear setup guidance.
-- [ ] **SIM-04**: When sim has the required room objects, the normal colony/bootstrap systems can proceed without a separate code path.
+- [x] **SIM-04**: When sim has the required room objects, the normal colony/bootstrap systems can proceed without a separate code path.
 
 ### Command System
 
@@ -67,10 +67,10 @@
 
 ### Strategy
 
-- [ ] **STR-01**: A strategy planner evaluates long-term colony stage and priorities on a configurable cadence instead of every tick.
-- [ ] **STR-02**: Strategy plans include reason strings explaining decisions such as upgrading, building, repairing, defense preparation, or deferring work.
-- [ ] **STR-03**: Low-risk tactical actions can run automatically while high-cost actions respect manual policy gates.
-- [ ] **STR-04**: Expansion, large fortification, remote mining, market automation, and warfare remain disabled unless policy explicitly enables them.
+- [x] **STR-01**: A strategy planner evaluates long-term colony stage and priorities on a configurable cadence instead of every tick.
+- [x] **STR-02**: Strategy plans include reason strings explaining decisions such as upgrading, building, repairing, defense preparation, or deferring work.
+- [x] **STR-03**: Low-risk tactical actions can run automatically while high-cost actions respect manual policy gates.
+- [x] **STR-04**: Expansion, large fortification, remote mining, market automation, and warfare remain disabled unless policy explicitly enables them.
 
 ### Minimal Bootstrap Loop
 
@@ -143,7 +143,7 @@
 | SIM-01 | Phase 2 | Validated |
 | SIM-02 | Phase 2 | Validated |
 | SIM-03 | Phase 2 | Validated |
-| SIM-04 | Phase 5 | Pending |
+| SIM-04 | Phase 5 | Complete |
 | CMD-01 | Phase 3 | Complete |
 | CMD-02 | Phase 3 | Complete |
 | CMD-03 | Phase 3 | Complete |
@@ -159,10 +159,10 @@
 | BEH-03 | Phase 4 | Complete |
 | BEH-04 | Phase 4 | Complete |
 | BEH-05 | Phase 4 | Complete |
-| STR-01 | Phase 5 | Pending |
-| STR-02 | Phase 5 | Pending |
-| STR-03 | Phase 5 | Pending |
-| STR-04 | Phase 5 | Pending |
+| STR-01 | Phase 5 | Complete |
+| STR-02 | Phase 5 | Complete |
+| STR-03 | Phase 5 | Complete |
+| STR-04 | Phase 5 | Complete |
 | BOOT-01 | Phase 6 | Pending |
 | BOOT-02 | Phase 6 | Pending |
 | BOOT-03 | Phase 6 | Pending |

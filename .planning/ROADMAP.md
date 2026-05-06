@@ -14,7 +14,7 @@ This roadmap builds lystran-brain from the existing Screeps TypeScript starter i
 | 2 | Observability and Environment Infrastructure | Add logger, profiler, stats, environment detection, and sim bootstrap infrastructure. | MEM-04, OBS-01, OBS-02, OBS-03, OBS-04, ENV-01, ENV-02, SIM-01, SIM-02, SIM-03, TEST-02, TEST-04 |
 | 3 | Console Command System | Complete 2026-05-05 — safe manual control and inspection through a scalable console command tree verified. | CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06, TEST-03 |
 | 4 | Colony and Behavior Primitives | Complete 2026-05-05 — colony context, room intel, process, role, task, spawn queue, body builder, read-only commands, and kernel wiring verified. | COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05 |
-| 5 | Strategy and Policy Planning | Add explainable semi-automatic long-term planning with policy gates and sim handoff. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
+| 5 | Strategy and Policy Planning | In progress 2026-05-06 — Memory constants foundation complete; explainable strategy planning remains underway. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
 | 6 | Minimal RCL1 Bootstrap Loop | Use the foundation to maintain workers, harvest energy, and upgrade a controller in sim or a normal room. | BOOT-01, BOOT-02, BOOT-03, BOOT-04 |
 
 ## Phase Details
@@ -124,6 +124,8 @@ Plans:
 
 ## Phase 5: Strategy and Policy Planning
 
+**Status:** In Progress — 1/5 plans complete as of 2026-05-06.
+
 **Goal:** Add explainable long-term decision support while preserving human control over expensive or risky actions.
 
 **Requirements:** STR-01, STR-02, STR-03, STR-04, SIM-04
@@ -182,7 +184,7 @@ Plans:
 | SIM-01 | Phase 2 | Validated |
 | SIM-02 | Phase 2 | Validated |
 | SIM-03 | Phase 2 | Validated |
-| SIM-04 | Phase 5 | Pending |
+| SIM-04 | Phase 5 | Complete |
 | CMD-01 | Phase 3 | Complete |
 | CMD-02 | Phase 3 | Complete |
 | CMD-03 | Phase 3 | Complete |
@@ -198,10 +200,10 @@ Plans:
 | BEH-03 | Phase 4 | Complete |
 | BEH-04 | Phase 4 | Complete |
 | BEH-05 | Phase 4 | Complete |
-| STR-01 | Phase 5 | Pending |
-| STR-02 | Phase 5 | Pending |
-| STR-03 | Phase 5 | Pending |
-| STR-04 | Phase 5 | Pending |
+| STR-01 | Phase 5 | Complete |
+| STR-02 | Phase 5 | Complete |
+| STR-03 | Phase 5 | Complete |
+| STR-04 | Phase 5 | Complete |
 | BOOT-01 | Phase 6 | Pending |
 | BOOT-02 | Phase 6 | Pending |
 | BOOT-03 | Phase 6 | Pending |
