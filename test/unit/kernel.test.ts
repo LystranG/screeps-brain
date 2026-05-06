@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
+import { ProcessName } from "constants/processes";
 import { RuntimeEnvironment } from "constants/runtime";
 import { CURRENT_MEMORY_VERSION, createDefaultProjectMemorySections } from "memory/schema";
 import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
@@ -236,6 +237,8 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.colonies.W2N2.status, "degraded");
     assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, ["missing spawn", "missing source"]);
     assert.equal(memory.processes.colonyIntel.lastRunTick, 200);
+    assert.equal(memory.processes[ProcessName.strategyPlanning].lastRunTick, 200);
+    assert.include(memory.processes[ProcessName.strategyPlanning].lastResult ?? "", "strategy refreshed=");
     assert.equal(memory.processes.creepRoles.lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastResult, "creep roles dispatched");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
