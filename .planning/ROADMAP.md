@@ -124,7 +124,7 @@ Plans:
 
 ## Phase 5: Strategy and Policy Planning
 
-**Status:** In Progress — 1/5 plans complete as of 2026-05-06.
+**Status:** In Progress — 2/5 plans complete as of 2026-05-06.
 
 **Goal:** Add explainable long-term decision support while preserving human control over expensive or risky actions.
 

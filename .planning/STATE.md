@@ -4,20 +4,20 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 05
 status: executing
-last_updated: "2026-05-06T07:38:33.478Z"
+last_updated: "2026-05-06T07:57:17.764Z"
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 24
-  completed_plans: 20
-  percent: 83
+  completed_plans: 21
+  percent: 88
 ---
 
 # GSD State: lystran-brain
 
 **Initialized:** 2026-05-03
 **Current Phase:** 05
-**Status:** Executing Phase 05 — 05-01 complete
+**Status:** Executing Phase 05 — 05-02 complete
 
 ## Project Reference
 
@@ -59,10 +59,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-03)
 
 ## Next Step
 
-Continue Phase 05 with Plan 05-02.
+Continue Phase 05 with Plan 05-03.
 
 ## Recent Session
 
+- 2026-05-06T07:54:45Z — Completed 05-02-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-02-SUMMARY.md`.
 - 2026-05-06T07:36:55Z — Completed 05-01-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-01-SUMMARY.md`.
 - 2026-05-06T02:47:13Z — Completed 04-06-PLAN.md; SUMMARY written at `.planning/phases/04-colony-and-behavior-primitives/04-06-SUMMARY.md`.
 - 2026-05-05T23:52:29Z — Completed 04-05-PLAN.md; SUMMARY written at `.planning/phases/04-colony-and-behavior-primitives/04-05-SUMMARY.md`.
@@ -84,3 +85,6 @@ Continue Phase 05 with Plan 05-02.
 - Strategy Memory stores compact intent descriptors and explanations only, never executable spawn/task work.
 - Phase 5 high-risk gates for expansion, remote mining, market, warfare, and large fortification default to false.
 - v4 migration repairs both legacy v3 Memory and current-version partial Memory without deleting Phase 4 runtime data.
+- Strategy planner output is intent-ready but remains pure: no spawn queue, task model, or Screeps action API calls.
+- High-risk strategy intents record exact policy gate names and default to gated when Memory policy flags are false.
+- Strategy refresh decisions check missing plans, cadence expiry, and key-state signatures before reporting no-refresh.
