@@ -1,8 +1,8 @@
-import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { StrategyIntentMemory, StrategyPlanMemory } from "memory/schema";
 
-const HighRiskGateLabels = {
+const highRiskGateLabels = {
   expansion: "allowExpansion",
   remoteMining: "allowRemoteMining",
   market: "allowMarket",
@@ -168,9 +168,9 @@ function resolveRoomName(memory: Memory, input: unknown): { ok: true; roomName: 
 function formatGateSettings(memory: Memory): string {
   const gates = memory.config.strategy;
 
-  return Object.keys(HighRiskGateLabels)
+  return Object.keys(highRiskGateLabels)
     .map(label => {
-      const gateKey = HighRiskGateLabels[label as keyof typeof HighRiskGateLabels];
+      const gateKey = highRiskGateLabels[label as keyof typeof highRiskGateLabels];
 
       return `${label}=${String(gates[gateKey])}`;
     })

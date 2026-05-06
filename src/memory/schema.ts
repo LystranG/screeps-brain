@@ -1,5 +1,5 @@
-import { RoleName } from "constants/roles";
 import type { StrategyIntentStatus, StrategyIntentType, StrategyMode } from "constants/strategy";
+import { RoleName } from "constants/roles";
 
 export const CURRENT_MEMORY_VERSION = 4;
 

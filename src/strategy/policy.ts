@@ -1,7 +1,7 @@
-import { StrategyIntentType } from "constants/strategy";
 import type { ProjectConfigMemory } from "memory/schema";
+import { StrategyIntentType } from "constants/strategy";
 
-const HIGH_RISK_INTENTS: ReadonlyArray<string> = [
+const HIGH_RISK_INTENTS: readonly string[] = [
   StrategyIntentType.deferExpansion,
   StrategyIntentType.deferRemoteMining,
   StrategyIntentType.deferMarket,

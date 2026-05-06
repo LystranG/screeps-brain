@@ -1,6 +1,6 @@
+import { buildStrategyPlan, shouldRefreshStrategyPlan } from "strategy/planner";
 import type { ColonyContext } from "colony/types";
 import type { ProjectMemoryShape } from "memory/schema";
-import { buildStrategyPlan, shouldRefreshStrategyPlan } from "strategy/planner";
 
 export interface StrategyPlanningRunSummary {
   evaluated: number;

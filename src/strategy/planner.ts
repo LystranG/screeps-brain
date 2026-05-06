@@ -1,8 +1,8 @@
-import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
-import type { ColonyContext } from "colony/types";
 import type { ProjectMemoryShape, StrategyIntentMemory, StrategyPlanMemory } from "memory/schema";
-import { isIntentAllowed, policyGateForIntent } from "strategy/policy";
+import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
 import type { StrategyRefreshDecision, StrategyTrigger } from "strategy/types";
+import { isIntentAllowed, policyGateForIntent } from "strategy/policy";
+import type { ColonyContext } from "colony/types";
 
 interface SignatureShape {
   readiness: string;
@@ -22,7 +22,7 @@ interface SignatureShape {
   allowLargeFortification: boolean;
 }
 
-const HIGH_RISK_DEFERRALS: ReadonlyArray<StrategyIntentType> = [
+const HIGH_RISK_DEFERRALS: readonly StrategyIntentType[] = [
   StrategyIntentType.deferExpansion,
   StrategyIntentType.deferRemoteMining,
   StrategyIntentType.deferMarket,
@@ -223,7 +223,7 @@ function addHighRiskDeferrals(
 ): void {
   for (const type of HIGH_RISK_DEFERRALS) {
     const allowed = isIntentAllowed(type, memory.config);
-    const gate = policyGateForIntent(type);
+    const gate = policyGateForIntent(type) ?? "strategy.unknown";
     const status = allowed ? StrategyIntentStatus.allowed : StrategyIntentStatus.gated;
     const reason = allowed ? `deferral: ${type} allowed by ${gate}` : `deferral: ${type} gated by ${gate}`;
 
