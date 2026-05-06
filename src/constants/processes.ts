@@ -8,6 +8,7 @@ export const ProcessName = {
   creepRoles: "creepRoles",
   spawn: "spawn",
   spawnValidation: "spawnValidation",
+  strategyPlanning: "strategyPlanning",
   cleanup: "cleanup",
   stats: "stats"
 } as const;

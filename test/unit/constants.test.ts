@@ -74,6 +74,7 @@ describe("constants|validation", () => {
       gated: "gated",
       deferred: "deferred"
     });
+    assert.deepEqual(Object.values(StrategyIntentStatus), ["allowed", "gated", "deferred"]);
   });
 
   it("accepts any non-empty room name string in Phase 1", () => {
