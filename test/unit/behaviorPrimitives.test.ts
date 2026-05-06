@@ -10,6 +10,30 @@ import { createDefaultRoleRegistry } from "roles/registry";
 import { clearTaskMemory, createTaskMemory, TaskStatus, TaskType, validateTaskMemory } from "tasks/model";
 
 describe("behavior primitives task model", () => {
+  it("provides Screeps action constants and creep action spies for behavior tests", () => {
+    const creep = createActionCreep(RoleName.worker);
+
+    assert.equal(ERR_NOT_IN_RANGE, -9);
+    assert.equal(ERR_NOT_ENOUGH_RESOURCES, -6);
+    assert.equal(RESOURCE_ENERGY, "energy");
+    assert.equal(creep.store.getUsedCapacity(RESOURCE_ENERGY), 0);
+    assert.equal(creep.store.getFreeCapacity(RESOURCE_ENERGY), 50);
+
+    creep.harvest({ id: "source-1" } as Source);
+    creep.upgradeController({ id: "controller-1" } as StructureController);
+    creep.transfer({ id: "spawn-1" } as StructureSpawn, RESOURCE_ENERGY);
+    creep.pickup({ id: "drop-1" } as Resource);
+    creep.moveTo({ id: "source-1" } as Source);
+
+    assert.deepEqual(creep.actionCalls.map(call => call.action), [
+      "harvest",
+      "upgradeController",
+      "transfer",
+      "pickup",
+      "moveTo"
+    ]);
+  });
+
   // Acceptance guard: runtime consumers depend on `export function validateTaskMemory`.
   it("creates assigned task memory with serialized state fields", () => {
     const task = createTaskMemory(TaskType.harvest, "source-1", 101);
@@ -318,6 +342,55 @@ function createNoopCreep(role: string): Creep {
       role
     }
   } as unknown as Creep;
+}
+
+interface ActionCall {
+  action: "harvest" | "upgradeController" | "transfer" | "pickup" | "moveTo";
+  target: { id?: string };
+  resourceType?: ResourceConstant;
+}
+
+interface ActionCreep extends Creep {
+  actionCalls: ActionCall[];
+}
+
+function createActionCreep(role: string, usedEnergy = 0, freeEnergy = 50): ActionCreep {
+  const actionCalls: ActionCall[] = [];
+  const record = (action: ActionCall["action"], target: { id?: string }, resourceType?: ResourceConstant): OK => {
+    actionCalls.push({ action, target, resourceType });
+
+    return OK;
+  };
+
+  return {
+    memory: {
+      role
+    },
+    store: {
+      getUsedCapacity(resourceType?: ResourceConstant): number {
+        return resourceType === undefined || resourceType === RESOURCE_ENERGY ? usedEnergy : 0;
+      },
+      getFreeCapacity(resourceType?: ResourceConstant): number {
+        return resourceType === undefined || resourceType === RESOURCE_ENERGY ? freeEnergy : 0;
+      }
+    },
+    harvest(target: Source): ScreepsReturnCode {
+      return record("harvest", target);
+    },
+    upgradeController(target: StructureController): ScreepsReturnCode {
+      return record("upgradeController", target);
+    },
+    transfer(target: Structure, resourceType: ResourceConstant): ScreepsReturnCode {
+      return record("transfer", target, resourceType);
+    },
+    pickup(target: Resource): ScreepsReturnCode {
+      return record("pickup", target);
+    },
+    moveTo(target: RoomPosition | { pos: RoomPosition }): CreepMoveReturnCode | ERR_NO_PATH | ERR_INVALID_TARGET {
+      return record("moveTo", target as { id?: string });
+    },
+    actionCalls
+  } as unknown as ActionCreep;
 }
 
 function createProcessMemory(processes: Record<string, ProcessMemory> = {}): Memory {
