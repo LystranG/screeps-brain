@@ -1,5 +1,9 @@
 import {
   CURRENT_MEMORY_VERSION,
+  ColoniesMemory,
+  ColonyIntelMemory,
+  ColonyMemory,
+  ColonyStatusMemory,
   CpuStageSummaryMemory,
   ProjectConfigMemory,
   RuntimeMemory,
@@ -13,6 +17,7 @@ type MigrationStep = (memory: Memory) => void;
 type LegacyRuntimeMemory = Partial<Omit<RuntimeMemory, "environment" | "sim">>;
 type LegacyConfigMemory = Partial<Omit<ProjectConfigMemory, "observability">>;
 type LegacyStatsMemory = Partial<Omit<StatsMemory, "cpu">> & { cpu?: Record<string, unknown> };
+type PartialColonyMemory = Partial<Omit<ColonyMemory, "intel">> & { intel?: Partial<ColonyIntelMemory> };
 
 const orderedMigrations: {[version: number]: MigrationStep} = {
   1: migrateToVersion1,
@@ -93,7 +98,7 @@ function migrateToVersion1(memory: Memory): void {
       ...legacyConfig?.defense
     }
   } as ProjectConfigMemory;
-  memory.colonies = memory.colonies || defaults.colonies;
+  memory.colonies = repairColonies(memory.colonies, memory.config);
   memory.processes = memory.processes || defaults.processes;
   memory.commands = {
     queue: memory.commands?.queue || defaults.commands.queue,
@@ -179,7 +184,7 @@ function migrateToVersion2(memory: Memory): void {
       }
     }
   };
-  memory.colonies = memory.colonies || defaults.colonies;
+  memory.colonies = repairColonies(memory.colonies, memory.config);
   memory.processes = memory.processes || defaults.processes;
   memory.commands = {
     queue: memory.commands?.queue || defaults.commands.queue,
@@ -257,7 +262,7 @@ function migrateToVersion3(memory: Memory): void {
       }
     }
   };
-  memory.colonies = memory.colonies || defaults.colonies;
+  memory.colonies = repairColonies(memory.colonies, memory.config);
   memory.processes = memory.processes || defaults.processes;
   memory.commands = {
     queue: memory.commands?.queue || defaults.commands.queue,
@@ -285,6 +290,66 @@ function extractLegacyCpuStages(legacyCpu: Record<string, unknown> | undefined):
   }
 
   return stages;
+}
+
+function repairColonies(
+  colonies: ColoniesMemory | undefined,
+  config: ProjectConfigMemory | undefined
+): ColoniesMemory {
+  const repaired: ColoniesMemory = {};
+
+  for (const roomName of Object.keys(colonies ?? {})) {
+    repaired[roomName] = repairColony(roomName, colonies?.[roomName] as PartialColonyMemory | undefined, config);
+  }
+
+  return repaired;
+}
+
+function repairColony(
+  roomName: string,
+  colony: PartialColonyMemory | undefined,
+  config: ProjectConfigMemory | undefined
+): ColonyMemory {
+  const existingColony = colony ?? {};
+  const resolvedRoomName = existingColony.roomName || roomName;
+  const primary = existingColony.primary ?? config?.colony?.primaryRoomName === resolvedRoomName;
+  const status = isColonyStatusMemory(existingColony.status) ? existingColony.status : "degraded";
+
+  // 旧 Memory 可能已有 colony 记录但缺少 Phase 4 字段；这里只补 JSON 安全默认值，不删除用户队列。
+  return {
+    roomName: resolvedRoomName,
+    primary,
+    status,
+    intel: repairColonyIntel(resolvedRoomName, primary, status, existingColony.intel),
+    spawnQueue: Array.isArray(existingColony.spawnQueue) ? existingColony.spawnQueue : []
+  };
+}
+
+function repairColonyIntel(
+  roomName: string,
+  primary: boolean,
+  status: ColonyStatusMemory,
+  intel: Partial<ColonyIntelMemory> | undefined
+): ColonyIntelMemory {
+  const existingIntel = intel ?? {};
+
+  return {
+    roomName: existingIntel.roomName || roomName,
+    lastSeenTick: typeof existingIntel.lastSeenTick === "number" ? existingIntel.lastSeenTick : 0,
+    lastRefreshTick: typeof existingIntel.lastRefreshTick === "number" ? existingIntel.lastRefreshTick : 0,
+    status: isColonyStatusMemory(existingIntel.status) ? existingIntel.status : status,
+    missingReasons: Array.isArray(existingIntel.missingReasons) ? existingIntel.missingReasons : [],
+    controllerId: typeof existingIntel.controllerId === "string" ? existingIntel.controllerId : null,
+    rcl: typeof existingIntel.rcl === "number" ? existingIntel.rcl : null,
+    sourceIds: Array.isArray(existingIntel.sourceIds) ? existingIntel.sourceIds : [],
+    spawnIds: Array.isArray(existingIntel.spawnIds) ? existingIntel.spawnIds : [],
+    primary: existingIntel.primary ?? primary,
+    stage: typeof existingIntel.stage === "string" ? existingIntel.stage : "unknown"
+  };
+}
+
+function isColonyStatusMemory(value: unknown): value is ColonyStatusMemory {
+  return value === "ready" || value === "degraded" || value === "error";
 }
 
 function isCpuStageSummaryMemory(value: unknown): value is CpuStageSummaryMemory {

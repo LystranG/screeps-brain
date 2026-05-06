@@ -386,6 +386,86 @@ describe("memory migrations", () => {
     assert.deepEqual(memory.creeps.worker1, { role: "worker" });
   });
 
+  it("repairs v2 colony records missing spawnQueue while preserving existing intel", () => {
+    const memory = {
+      version: 2,
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W1N1"
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 30,
+            lastRefreshTick: 30,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 2,
+            sourceIds: ["source1", "source2"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl2"
+          }
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.deepEqual(memory.colonies.W1N1.spawnQueue, []);
+    assert.equal(memory.colonies.W1N1.roomName, "W1N1");
+    assert.isTrue(memory.colonies.W1N1.primary);
+    assert.equal(memory.colonies.W1N1.status, "ready");
+    assert.deepEqual(memory.colonies.W1N1.intel.sourceIds, ["source1", "source2"]);
+    assert.deepEqual(memory.colonies.W1N1.intel.spawnIds, ["spawn1"]);
+    assert.equal(memory.colonies.W1N1.intel.controllerId, "controller1");
+  });
+
+  it("repairs current-version colony records to safe degraded defaults", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W2N2"
+        }
+      },
+      colonies: {
+        W2N2: {
+          roomName: "W2N2",
+          primary: true
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.isArray(memory.colonies.W2N2.spawnQueue);
+    assert.deepEqual(memory.colonies.W2N2.spawnQueue, []);
+    assert.equal(memory.colonies.W2N2.status, "degraded");
+    assert.equal(memory.colonies.W2N2.intel.roomName, "W2N2");
+    assert.isArray(memory.colonies.W2N2.intel.missingReasons);
+    assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, []);
+    assert.isTrue(memory.colonies.W2N2.primary);
+  });
+
   it("preserves legacy CPU stage summaries when migrating to v2", () => {
     const legacyHarvest = {
       last: 2,
