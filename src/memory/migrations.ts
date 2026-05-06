@@ -7,10 +7,12 @@ import {
   CpuStageSummaryMemory,
   ProjectConfigMemory,
   RuntimeMemory,
+  SpawnRequestMemory,
   StatsMemory,
   StrategyPlanMemory,
   createDefaultProjectMemorySections
 } from "memory/schema";
+import { RoleName } from "constants/roles";
 import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
 
 export type MigrationResult = { ok: true; version: typeof CURRENT_MEMORY_VERSION } | { ok: false; reason: string };
@@ -21,12 +23,14 @@ type LegacyConfigMemory = Partial<Omit<ProjectConfigMemory, "observability">>;
 type LegacyStatsMemory = Partial<Omit<StatsMemory, "cpu">> & { cpu?: Record<string, unknown> };
 type PartialColonyMemory = Partial<Omit<ColonyMemory, "intel">> & { intel?: Partial<ColonyIntelMemory> };
 type PartialStrategyPlanMemory = Partial<StrategyPlanMemory>;
+type PartialSpawnRequestMemory = Partial<SpawnRequestMemory>;
 
 const orderedMigrations: {[version: number]: MigrationStep} = {
   1: migrateToVersion1,
   2: migrateToVersion2,
   3: migrateToVersion3,
-  4: migrateToVersion4
+  4: migrateToVersion4,
+  5: migrateToVersion5
 };
 
 /**
@@ -279,6 +283,84 @@ function migrateToVersion4(memory: Memory): void {
   const defaults = createDefaultProjectMemorySections();
 
   // v4 只补策略配置门和每个 colony 的解释型摘要；Phase 4 的运行时、队列和进程数据原样保留。
+  memory.version = 4;
+  memory.runtime = {
+    ...defaults.runtime,
+    ...memory.runtime,
+    lastMigration: 4,
+    migrationError: null,
+    environment: {
+      ...defaults.runtime.environment,
+      ...memory.runtime?.environment
+    },
+    sim: {
+      ...defaults.runtime.sim,
+      ...memory.runtime?.sim,
+      bootstrap: {
+        ...defaults.runtime.sim.bootstrap,
+        ...memory.runtime?.sim?.bootstrap
+      },
+      guidance: memory.runtime?.sim?.guidance || defaults.runtime.sim.guidance
+    }
+  };
+  memory.config = {
+    automation: {
+      ...defaults.config.automation,
+      ...memory.config?.automation
+    },
+    strategy: {
+      ...defaults.config.strategy,
+      ...memory.config?.strategy
+    },
+    construction: {
+      ...defaults.config.construction,
+      ...memory.config?.construction
+    },
+    defense: {
+      ...defaults.config.defense,
+      ...memory.config?.defense
+    },
+    colony: {
+      ...defaults.config.colony,
+      ...memory.config?.colony
+    },
+    observability: {
+      ...defaults.config.observability,
+      ...memory.config?.observability,
+      profiler: {
+        ...defaults.config.observability.profiler,
+        ...memory.config?.observability?.profiler
+      },
+      deepProfiler: {
+        ...defaults.config.observability.deepProfiler,
+        ...memory.config?.observability?.deepProfiler
+      }
+    }
+  };
+  memory.stats = {
+    ticks: typeof memory.stats?.ticks === "number" ? memory.stats.ticks : defaults.stats.ticks,
+    cpu: {
+      ...defaults.stats.cpu,
+      ...memory.stats?.cpu,
+      stages: {
+        ...defaults.stats.cpu.stages,
+        ...memory.stats?.cpu?.stages
+      }
+    }
+  };
+  memory.colonies = repairColonies(memory.colonies, memory.config);
+  memory.processes = memory.processes || defaults.processes;
+  memory.commands = {
+    queue: memory.commands?.queue || defaults.commands.queue,
+    history: memory.commands?.history || defaults.commands.history
+  };
+  memory.creeps = memory.creeps || {};
+}
+
+function migrateToVersion5(memory: Memory): void {
+  const defaults = createDefaultProjectMemorySections();
+
+  // v5 给真实 spawn 生命周期补齐 JSON-only 字段；队列条目按字段修复，不因旧状态丢失用户请求。
   memory.version = CURRENT_MEMORY_VERSION;
   memory.runtime = {
     ...defaults.runtime,
@@ -403,8 +485,40 @@ function repairColony(
     primary,
     status,
     intel: repairColonyIntel(resolvedRoomName, primary, status, existingColony.intel),
-    spawnQueue: Array.isArray(existingColony.spawnQueue) ? existingColony.spawnQueue : [],
+    spawnQueue: repairSpawnQueue(resolvedRoomName, existingColony.spawnQueue),
     strategy: repairStrategyPlan(resolvedRoomName, existingColony.strategy as PartialStrategyPlanMemory | undefined)
+  };
+}
+
+function repairSpawnQueue(roomName: string, spawnQueue: unknown): SpawnRequestMemory[] {
+  if (!Array.isArray(spawnQueue)) {
+    return [];
+  }
+
+  return spawnQueue.map((request, index) => repairSpawnRequest(roomName, request, index));
+}
+
+function repairSpawnRequest(roomName: string, request: unknown, index: number): SpawnRequestMemory {
+  const candidate = typeof request === "object" && request !== null ? (request as PartialSpawnRequestMemory) : {};
+  const requestId = typeof candidate.id === "string" ? candidate.id : `repaired-spawn-request-${index}`;
+  const requestRoomName = typeof candidate.roomName === "string" ? candidate.roomName : roomName;
+
+  return {
+    id: requestId,
+    roomName: requestRoomName,
+    role: isRoleName(candidate.role) ? candidate.role : RoleName.worker,
+    priority: typeof candidate.priority === "number" ? candidate.priority : 100,
+    body: repairBody(candidate.body),
+    memory: repairCreepMemory(candidate.memory),
+    reason: typeof candidate.reason === "string" ? candidate.reason : "repaired spawn request",
+    requestedTick: typeof candidate.requestedTick === "number" ? candidate.requestedTick : 0,
+    status: isSpawnRequestStatus(candidate.status) ? candidate.status : "queued",
+    attempts: typeof candidate.attempts === "number" ? candidate.attempts : 0,
+    lastError: candidate.lastError === null || typeof candidate.lastError === "string" ? candidate.lastError : null,
+    lastTriedTick: typeof candidate.lastTriedTick === "number" ? candidate.lastTriedTick : null,
+    spawnName: candidate.spawnName === null || typeof candidate.spawnName === "string" ? candidate.spawnName : null,
+    creepName: candidate.creepName === null || typeof candidate.creepName === "string" ? candidate.creepName : null,
+    completedTick: typeof candidate.completedTick === "number" ? candidate.completedTick : null
   };
 }
 
@@ -433,6 +547,30 @@ export function repairStrategyPlan(
 
 function repairStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function repairBody(value: unknown): BodyPartConstant[] {
+  return Array.isArray(value) ? value.filter((part): part is BodyPartConstant => typeof part === "string") : [];
+}
+
+function repairCreepMemory(value: unknown): CreepMemory {
+  return typeof value === "object" && value !== null ? (value as CreepMemory) : {};
+}
+
+function isRoleName(value: unknown): value is RoleName {
+  return value === RoleName.worker || value === RoleName.harvester || value === RoleName.upgrader || value === RoleName.builder;
+}
+
+function isSpawnRequestStatus(value: unknown): value is SpawnRequestMemory["status"] {
+  return (
+    value === "queued" ||
+    value === "validating" ||
+    value === "validated" ||
+    value === "blocked" ||
+    value === "spawning" ||
+    value === "spawned" ||
+    value === "failed"
+  );
 }
 
 function repairStrategyIntentList(value: unknown): StrategyPlanMemory["intents"] {

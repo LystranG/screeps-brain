@@ -397,7 +397,19 @@ describe("memory migrations", () => {
       primaryRoomName: "W1N1",
       intelRefreshCadence: 50
     });
-    assert.deepInclude(memory.colonies.W1N1 as unknown as Record<string, unknown>, colonyMemory);
+    assert.deepInclude(memory.colonies.W1N1 as unknown as Record<string, unknown>, {
+      roomName: colonyMemory.roomName,
+      primary: colonyMemory.primary,
+      status: colonyMemory.status,
+      intel: colonyMemory.intel
+    });
+    assert.deepEqual(memory.colonies.W1N1.spawnQueue[0] as unknown, {
+      ...colonyMemory.spawnQueue[0],
+      lastTriedTick: null,
+      spawnName: null,
+      creepName: null,
+      completedTick: null
+    });
     assert.deepEqual(memory.colonies.W1N1.strategy, {
       version: 1,
       roomName: "W1N1",
@@ -571,7 +583,15 @@ describe("memory migrations", () => {
       allowLargeFortification: false
     });
     assert.deepEqual(memory.colonies.W1N1.intel.sourceIds, ["source1"]);
-    assert.deepEqual(memory.colonies.W1N1.spawnQueue as unknown, spawnQueue);
+    assert.deepEqual(memory.colonies.W1N1.spawnQueue as unknown, [
+      {
+        ...spawnQueue[0],
+        lastTriedTick: null,
+        spawnName: null,
+        creepName: null,
+        completedTick: null
+      }
+    ]);
     assert.equal(memory.colonies.W1N1.strategy.status, "stale");
     assert.equal(memory.colonies.W1N1.strategy.lastTrigger, "migration");
     assert.include(memory.colonies.W1N1.strategy.reasons, "strategy pending evaluation");

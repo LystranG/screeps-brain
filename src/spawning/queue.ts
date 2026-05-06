@@ -44,7 +44,11 @@ export function createSpawnRequest(params: CreateSpawnRequestParams): SpawnReque
     requestedTick: params.requestedTick,
     status: "queued",
     attempts: 0,
-    lastError: null
+    lastError: null,
+    lastTriedTick: null,
+    spawnName: null,
+    creepName: null,
+    completedTick: null
   };
 }
 

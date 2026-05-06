@@ -369,7 +369,11 @@ describe("command inspection|spawn", () => {
           requestedTick: 99,
           status: "queued",
           attempts: 1,
-          lastError: "-6"
+          lastError: "-6",
+          lastTriedTick: null,
+          spawnName: null,
+          creepName: null,
+          completedTick: null
         }
       ],
       strategy: createDefaultStrategyPlanMemory("W1N1", "test")
@@ -403,7 +407,11 @@ describe("command inspection|spawn", () => {
           requestedTick: 101,
           status: "blocked",
           attempts: 0,
-          lastError: "missing spawn"
+          lastError: "missing spawn",
+          lastTriedTick: null,
+          spawnName: null,
+          creepName: null,
+          completedTick: null
         }
       ],
       strategy: createDefaultStrategyPlanMemory("W2N2", "test")

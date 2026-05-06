@@ -291,7 +291,11 @@ describe("spawn primitives spawn queue", () => {
       requestedTick: 10,
       status: "queued",
       attempts: 0,
-      lastError: null
+      lastError: null,
+      lastTriedTick: null,
+      spawnName: null,
+      creepName: null,
+      completedTick: null
     });
   });
 

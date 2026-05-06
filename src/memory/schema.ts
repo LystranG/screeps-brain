@@ -1,7 +1,7 @@
 import type { StrategyIntentStatus, StrategyIntentType, StrategyMode } from "constants/strategy";
 import { RoleName } from "constants/roles";
 
-export const CURRENT_MEMORY_VERSION = 4;
+export const CURRENT_MEMORY_VERSION = 5;
 
 export interface LogNamespaceConfigMemory {
   enabled?: boolean;
@@ -127,6 +127,10 @@ export interface SpawnRequestMemory {
   status: "queued" | "validating" | "validated" | "blocked" | "spawning" | "spawned" | "failed";
   attempts: number;
   lastError: string | null;
+  lastTriedTick: number | null;
+  spawnName: string | null;
+  creepName: string | null;
+  completedTick: number | null;
 }
 
 export interface ColonyMemory {
