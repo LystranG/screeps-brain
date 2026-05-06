@@ -1,9 +1,12 @@
 import { assert } from "chai";
+import { applyBootstrapSpawnDemand } from "bootstrap/spawnDemand";
 import { BootstrapSlot, buildBootstrapSlots } from "bootstrap/slots";
+import { assignBootstrapTasks } from "bootstrap/taskAssignment";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { createDefaultProjectMemorySections } from "memory/schema";
-import { TaskType } from "tasks/model";
+import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
+import { createTaskMemory, TaskStatus, TaskType } from "tasks/model";
 
 before(() => {
   const globals = global as unknown as { [name: string]: unknown };
@@ -121,6 +124,128 @@ describe("bootstrap execution slots", () => {
   });
 });
 
+describe("bootstrap execution spawn demand", () => {
+  it("enqueues stable bootstrap spawn requests and counts active duplicates", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a"), createSource("source-b")],
+      controller: createController("controller-a"),
+      creeps: []
+    });
+    const result = buildBootstrapSlots(context, memory, 260);
+
+    const created = applyBootstrapSpawnDemand(result.slots, memory, context, 260);
+
+    assert.equal(created.created, 5);
+    assert.equal(created.duplicate, 0);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].id, "bootstrap:W1N1:source:source-a:0:worker");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].role, RoleName.worker);
+
+    const duplicate = applyBootstrapSpawnDemand(result.slots, memory, context, 261);
+
+    assert.equal(duplicate.created, 0);
+    assert.equal(duplicate.duplicate, 5);
+    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 5);
+  });
+
+  it("does not re-enqueue queued, validated, or spawning requests for the same slot", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a")],
+      controller: createController("controller-a"),
+      creeps: []
+    });
+    const result = buildBootstrapSlots(context, memory, 262);
+    const sourceSlot = result.slots.find(slot => slot.id === "source:source-a:0");
+
+    assert.isDefined(sourceSlot);
+
+    for (const status of ["queued", "validated", "spawning"] as const) {
+      memory.colonies = {};
+      const request = createSpawnRequest({
+        id: `bootstrap:W1N1:${sourceSlot?.id}:worker`,
+        roomName: "W1N1",
+        role: RoleName.worker,
+        priority: 20,
+        body: ["work", "carry", "move"],
+        memory: { role: RoleName.worker } as CreepMemory,
+        reason: "existing active request",
+        requestedTick: 262
+      });
+      request.status = status;
+      enqueueSpawnRequest(memory, request);
+
+      const duplicate = applyBootstrapSpawnDemand([sourceSlot as BootstrapSlot], memory, context, 263);
+
+      assert.equal(duplicate.created, 0);
+      assert.equal(duplicate.duplicate, 1);
+      assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+    }
+  });
+});
+
+describe("bootstrap execution task assignment", () => {
+  it("preserves valid current assignments instead of thrashing creep task memory", () => {
+    const source = createSource("source-a");
+    const currentTask = createTaskMemory(TaskType.harvest, source.id, 270);
+    currentTask.status = TaskStatus.running;
+    const creep = createCreep("Worker1", RoleName.worker, 0, currentTask);
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [source],
+      controller: createController("controller-a"),
+      creeps: [creep]
+    });
+    const result = buildBootstrapSlots(context, createMemory(), 271);
+
+    const summary = assignBootstrapTasks(result.slots, context, 271);
+
+    assert.equal(summary.preserved, 1);
+    assert.equal(summary.assigned, 0);
+    assert.equal(creep.memory.task, currentTask);
+  });
+
+  it("assigns empty workers to nearest source harvest and loaded workers to controller upgrade", () => {
+    const source = createSource("source-a");
+    const controller = createController("controller-a");
+    const emptyWorker = createCreep("WorkerA", RoleName.worker, 0);
+    const loadedWorker = createCreep("WorkerB", RoleName.worker, 50);
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [source, createSource("source-b")],
+      controller,
+      creeps: [loadedWorker, emptyWorker]
+    });
+    const result = buildBootstrapSlots(context, createMemory(), 272);
+
+    const summary = assignBootstrapTasks(result.slots, context, 272);
+
+    assert.equal(summary.assigned, 2);
+    assert.deepEqual(emptyWorker.memory.task, createTaskMemory(TaskType.harvest, source.id, 272));
+    assert.deepEqual(loadedWorker.memory.task, createTaskMemory(TaskType.upgrade, controller.id, 272));
+  });
+
+  it("reassigns invalid or missing target tasks when another valid slot exists", () => {
+    const source = createSource("source-a");
+    const staleTask = createTaskMemory(TaskType.harvest, "missing-source", 273);
+    const creep = createCreep("Worker1", RoleName.worker, 0, staleTask);
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [source],
+      controller: null,
+      creeps: [creep]
+    });
+    const result = buildBootstrapSlots(context, createMemory(), 274);
+
+    const summary = assignBootstrapTasks(result.slots, context, 274);
+
+    assert.equal(summary.assigned, 1);
+    assert.deepEqual(creep.memory.task, createTaskMemory(TaskType.harvest, source.id, 274));
+  });
+});
+
 function createMemory(): Memory {
   return {
     creeps: {},
@@ -203,10 +328,16 @@ function createController(id: string): StructureController {
   } as StructureController;
 }
 
-function createCreep(name: string, role: RoleName, energy: number): Creep {
+function createCreep(name: string, role: RoleName, energy: number, task?: ReturnType<typeof createTaskMemory>): Creep {
   return {
     name,
-    memory: { role },
+    memory: {
+      role,
+      task
+    },
+    pos: {
+      findClosestByRange: (targets: Source[]): Source | null => targets[0] ?? null
+    },
     store: {
       getUsedCapacity: (resource?: ResourceConstant): number => (resource === RESOURCE_ENERGY ? energy : energy)
     }
