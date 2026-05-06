@@ -119,9 +119,14 @@ function formatQueueCounts(roomName: string, queue: SpawnRequestMemory[]): strin
   const queued = queue.filter(request => request.status === "queued").length;
   const blocked = queue.filter(request => request.status === "blocked").length;
   const validated = queue.filter(request => request.status === "validated").length;
+  const spawning = queue.filter(request => request.status === "spawning").length;
+  const spawned = queue.filter(request => request.status === "spawned").length;
   const failed = queue.filter(request => request.status === "failed").length;
 
-  return `${roomName}:queued=${queued} blocked=${blocked} validated=${validated} failed=${failed}`;
+  return (
+    `${roomName}:queued=${queued} blocked=${blocked} validated=${validated} ` +
+    `spawning=${spawning} spawned=${spawned} failed=${failed}`
+  );
 }
 
 function countSpawns(contexts: ColonyContext[]): { idle: number; busy: number } {
