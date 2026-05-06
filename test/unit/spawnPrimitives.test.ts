@@ -3,6 +3,7 @@ import { ColonyContext } from "colony/types";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { buildBody, calculateBodyCost } from "spawning/bodyBuilder";
 import {
+  MAX_VALIDATION_ATTEMPTS,
   createSpawnRequest,
   enqueueSpawnRequest,
   markSpawnRequestError,
@@ -22,6 +23,7 @@ before(() => {
     move: 50
   };
   globals.OK = 0;
+  globals.ERR_INVALID_ARGS = -10;
   globals.ERR_NOT_ENOUGH_ENERGY = -6;
 });
 
@@ -157,6 +159,105 @@ describe("spawn primitives dry-run runner", () => {
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-6");
     assert.isTrue(spawn.calls[0].options.dryRun);
   });
+
+  it("validates a later secondary request when the primary candidate has no idle spawn", () => {
+    const memory = createMemoryWithDefaults();
+    memory.config.colony.primaryRoomName = "W1N1";
+    const primarySpawn = createSpawn("PrimarySpawn", true);
+    const secondarySpawn = createSpawn("SecondarySpawn");
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "primary-busy",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "primary busy",
+        requestedTick: 20
+      })
+    );
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "secondary-later-valid",
+        roomName: "W2N2",
+        role: "builder",
+        priority: 2,
+        body: ["work", "carry", "move"],
+        memory: { role: "builder" } as CreepMemory,
+        reason: "secondary fallback",
+        requestedTick: 21
+      })
+    );
+
+    const result = runSpawnValidation(
+      [createContext("W1N1", true, [primarySpawn]), createContext("W2N2", false, [secondarySpawn])],
+      memory,
+      {} as Game,
+      24
+    );
+
+    assert.isTrue(result.ok);
+    assert.equal(result.status, "validated");
+    assert.equal(result.requestId, "secondary-later-valid");
+    assert.equal(primarySpawn.calls.length, 0);
+    assert.equal(secondarySpawn.calls.length, 1);
+    assert.deepEqual(secondarySpawn.calls[0].options, {
+      memory: { role: "builder" },
+      dryRun: true
+    });
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+    assert.equal(memory.colonies.W2N2.spawnQueue[0].status, "validated");
+  });
+
+  it("fails an invalid high-priority request after the cap and validates a later valid request", () => {
+    const memory = createMemoryWithDefaults();
+    const invalidSpawn = createSpawn("Spawn1", false, ERR_INVALID_ARGS);
+    const validSpawn = createSpawn("Spawn1", false, OK);
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "invalid high-priority",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "invalid high-priority regression",
+        requestedTick: 20
+      })
+    );
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "later valid",
+        roomName: "W1N1",
+        role: "upgrader",
+        priority: 2,
+        body: ["work", "carry", "move"],
+        memory: { role: "upgrader" } as CreepMemory,
+        reason: "later valid regression",
+        requestedTick: 21
+      })
+    );
+
+    for (let offset = 0; offset < MAX_VALIDATION_ATTEMPTS; offset += 1) {
+      runSpawnValidation([createContext("W1N1", true, [invalidSpawn])], memory, {} as Game, 25 + offset);
+    }
+
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "failed");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, MAX_VALIDATION_ATTEMPTS);
+
+    const result = runSpawnValidation([createContext("W1N1", true, [validSpawn])], memory, {} as Game, 30);
+
+    assert.isTrue(result.ok);
+    assert.equal(result.status, "validated");
+    assert.equal(result.requestId, "later valid");
+    assert.equal(validSpawn.calls.length, 1);
+    assert.equal(memory.colonies.W1N1.spawnQueue[1].status, "validated");
+  });
 });
 
 describe("spawn primitives spawn queue", () => {
@@ -237,7 +338,10 @@ describe("spawn primitives spawn queue", () => {
       })
     );
 
-    const selected = selectNextSpawnRequest([createContext("W1N1", false), createContext("W2N2", true)], memory);
+    const selected = selectNextSpawnRequest(
+      [createContext("W1N1", false, [createSpawn("RemoteSpawn")]), createContext("W2N2", true, [createSpawn("PrimarySpawn")])],
+      memory
+    );
 
     assert.equal(selected?.request.id, "primary-earlier");
     assert.equal(selected?.context.roomName, "W2N2");
@@ -262,7 +366,12 @@ describe("spawn primitives spawn queue", () => {
     assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 1);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-6");
 
-    markSpawnRequestValidated(memory, "W1N1", "spawn-worker-2", 17);
+    markSpawnRequestError(memory, "W1N1", "spawn-worker-2", "-6", 17);
+    markSpawnRequestError(memory, "W1N1", "spawn-worker-2", "-6", 18);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "failed");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, MAX_VALIDATION_ATTEMPTS);
+
+    markSpawnRequestValidated(memory, "W1N1", "spawn-worker-2", 19);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, null);
   });

@@ -1,6 +1,9 @@
 import { ColonyMemory, ProjectMemoryShape, SpawnRequestMemory } from "memory/schema";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
+import { calculateBodyCost } from "spawning/bodyBuilder";
+
+export const MAX_VALIDATION_ATTEMPTS = 3;
 
 export interface CreateSpawnRequestParams {
   id: string;
@@ -22,6 +25,11 @@ export interface SpawnQueueResult {
 export interface SelectedSpawnRequest {
   context: ColonyContext;
   request: SpawnRequestMemory;
+}
+
+export interface SpawnQueueStatus {
+  hasQueuedRequest: boolean;
+  hasQueuedRequestWithIdleSpawn: boolean;
 }
 
 export function createSpawnRequest(params: CreateSpawnRequestParams): SpawnRequestMemory {
@@ -63,12 +71,7 @@ export function selectNextSpawnRequest(
   contexts: ColonyContext[],
   memory: ProjectMemoryShape
 ): SelectedSpawnRequest | null {
-  const contextByRoomName = new Map<string, ColonyContext>();
-
-  for (const context of contexts) {
-    contextByRoomName.set(context.roomName, context);
-  }
-
+  const contextByRoomName = createContextByRoomName(contexts);
   const candidates: SelectedSpawnRequest[] = [];
 
   for (const colony of Object.values(memory.colonies)) {
@@ -78,8 +81,10 @@ export function selectNextSpawnRequest(
       continue;
     }
 
-    for (const request of colony.spawnQueue) {
-      if (request.status === "queued") {
+    const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
+
+    for (const request of queue) {
+      if (request.status === "queued" && isUsableSpawnCandidate(context, request)) {
         candidates.push({ context, request });
       }
     }
@@ -88,6 +93,36 @@ export function selectNextSpawnRequest(
   candidates.sort((left, right) => compareSelectedSpawnRequests(left, right, memory.config.colony.primaryRoomName));
 
   return candidates[0] ?? null;
+}
+
+export function inspectSpawnQueueStatus(contexts: ColonyContext[], memory: ProjectMemoryShape): SpawnQueueStatus {
+  const contextByRoomName = createContextByRoomName(contexts);
+  let hasQueuedRequest = false;
+  let hasQueuedRequestWithIdleSpawn = false;
+
+  for (const colony of Object.values(memory.colonies)) {
+    const context = contextByRoomName.get(colony.roomName);
+
+    if (!context) {
+      continue;
+    }
+
+    const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
+
+    for (const request of queue) {
+      if (request.status !== "queued") {
+        continue;
+      }
+
+      hasQueuedRequest = true;
+      hasQueuedRequestWithIdleSpawn = hasQueuedRequestWithIdleSpawn || hasIdleSpawn(context);
+    }
+  }
+
+  return {
+    hasQueuedRequest,
+    hasQueuedRequestWithIdleSpawn
+  };
 }
 
 export function markSpawnRequestValidated(
@@ -131,15 +166,37 @@ export function markSpawnRequestError(
     };
   }
 
-  request.status = "queued";
   request.attempts += 1;
   request.lastError = error;
   request.requestedTick = tick;
+  request.status = request.attempts >= MAX_VALIDATION_ATTEMPTS ? "failed" : "queued";
 
   return {
     ok: true,
     request
   };
+}
+
+function isUsableSpawnCandidate(context: ColonyContext, request: SpawnRequestMemory): boolean {
+  if (context.readiness !== "ready") {
+    return false;
+  }
+
+  if (!hasIdleSpawn(context)) {
+    return false;
+  }
+
+  return calculateBodyCost(request.body) <= context.energy.spawnCapacity;
+}
+
+function createContextByRoomName(contexts: ColonyContext[]): Map<string, ColonyContext> {
+  const contextByRoomName = new Map<string, ColonyContext>();
+
+  for (const context of contexts) {
+    contextByRoomName.set(context.roomName, context);
+  }
+
+  return contextByRoomName;
 }
 
 function compareSelectedSpawnRequests(
@@ -159,6 +216,12 @@ function compareSelectedSpawnRequests(
     return priorityOrder;
   }
 
+  const readinessOrder = readinessRank(left.context.readiness) - readinessRank(right.context.readiness);
+
+  if (readinessOrder !== 0) {
+    return readinessOrder;
+  }
+
   const tickOrder = left.request.requestedTick - right.request.requestedTick;
 
   if (tickOrder !== 0) {
@@ -174,6 +237,22 @@ function primaryRank(selected: SelectedSpawnRequest, primaryRoomName: string | n
   }
 
   return 1;
+}
+
+function readinessRank(readiness: ColonyContext["readiness"]): number {
+  if (readiness === "ready") {
+    return 0;
+  }
+
+  if (readiness === "degraded") {
+    return 1;
+  }
+
+  return 2;
+}
+
+function hasIdleSpawn(context: ColonyContext): boolean {
+  return context.spawns.some(spawn => !spawn.spawning);
 }
 
 function findSpawnRequest(

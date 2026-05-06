@@ -1,5 +1,6 @@
 import {
   SelectedSpawnRequest,
+  inspectSpawnQueueStatus,
   markSpawnRequestError,
   markSpawnRequestValidated,
   selectNextSpawnRequest
@@ -28,6 +29,16 @@ export function runSpawnValidation(
   const selected = selectNextSpawnRequest(contexts, memory);
 
   if (!selected) {
+    const queueStatus = inspectSpawnQueueStatus(contexts, memory);
+
+    if (queueStatus.hasQueuedRequest && !queueStatus.hasQueuedRequestWithIdleSpawn) {
+      return {
+        ok: false,
+        status: "skipped",
+        reason: "no idle spawn in colony"
+      };
+    }
+
     return {
       ok: false,
       status: "skipped",
