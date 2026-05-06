@@ -374,6 +374,57 @@ describe("command inspection|spawn", () => {
           spawnName: null,
           creepName: null,
           completedTick: null
+        },
+        {
+          id: "spawn-upgrader-1",
+          roomName: "W1N1",
+          role: "upgrader",
+          priority: 3,
+          body: ["work", "carry", "move"],
+          memory: { role: "upgrader" } as CreepMemory,
+          reason: "validated upgrade coverage",
+          requestedTick: 100,
+          status: "validated",
+          attempts: 0,
+          lastError: null,
+          lastTriedTick: 100,
+          spawnName: null,
+          creepName: null,
+          completedTick: null
+        },
+        {
+          id: "spawn-worker-active",
+          roomName: "W1N1",
+          role: "worker",
+          priority: 4,
+          body: ["work", "carry", "move"],
+          memory: { role: "worker" } as CreepMemory,
+          reason: "spawning worker coverage",
+          requestedTick: 101,
+          status: "spawning",
+          attempts: 0,
+          lastError: null,
+          lastTriedTick: 101,
+          spawnName: "SpawnPrimary",
+          creepName: "WorkerActive",
+          completedTick: null
+        },
+        {
+          id: "spawn-worker-done",
+          roomName: "W1N1",
+          role: "worker",
+          priority: 6,
+          body: ["work", "carry", "move"],
+          memory: { role: "worker" } as CreepMemory,
+          reason: "spawned worker coverage",
+          requestedTick: 98,
+          status: "spawned",
+          attempts: 0,
+          lastError: null,
+          lastTriedTick: 99,
+          spawnName: "SpawnPrimary",
+          creepName: "WorkerDone",
+          completedTick: 100
         }
       ],
       strategy: createDefaultStrategyPlanMemory("W1N1", "test")
@@ -483,8 +534,8 @@ describe("command inspection|spawn", () => {
     assert.include(help, "cmd.spawn.status()");
     assert.include(help, "cmd.spawn.queue()");
     assert.include(help, "cmd.spawn.dryRun(room?, role?, energy?)");
-    assert.include(status.message, "W1N1:queued=1 blocked=0 validated=0 failed=0");
-    assert.include(status.message, "W2N2:queued=0 blocked=1 validated=0 failed=0");
+    assert.include(status.message, "W1N1:queued=1 blocked=0 validated=1 spawning=1 spawned=1 failed=0");
+    assert.include(status.message, "W2N2:queued=0 blocked=1 validated=0 spawning=0 spawned=0 failed=0");
     assert.include(status.message, "spawns=idle:1 busy:1");
     assert.include(queue.message, "id=spawn-worker-1");
     assert.include(queue.message, "room=W1N1");
