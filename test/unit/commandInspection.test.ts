@@ -64,10 +64,17 @@ describe("command inspection|env|sim", () => {
     };
     memory.runtime.sim.guidance = {
       "missing-spawn": {
-        message: "Sim setup needs at least one owned spawn.",
+        message:
+          "Sim setup needs at least one owned spawn; runtime code cannot create sources, spawns, or initial creeps.",
         lastSeenTick: 120,
         lastLoggedTick: 121,
         flagName: "lystran-sim-spawn-needed"
+      },
+      "missing-controller": {
+        message:
+          "Sim setup needs a visible controller; runtime code cannot create sources, spawns, or initial creeps.",
+        lastSeenTick: 122,
+        lastLoggedTick: 123
       }
     };
     const namespace = createSimNamespace();
@@ -91,7 +98,8 @@ describe("command inspection|env|sim", () => {
     assert.include(status.message, "ready=false");
     assert.include(status.message, "lastRunTick=123");
     assert.include(guidance.message, "missing-spawn");
-    assert.include(guidance.message, "message=Sim setup needs at least one owned spawn.");
+    assert.include(guidance.message, "runtime code cannot create sources, spawns, or initial creeps");
+    assert.include(guidance.message, "missing-controller");
     assert.include(guidance.message, "lastSeenTick=120");
     assert.include(guidance.message, "lastLoggedTick=121");
     assert.include(guidance.message, "flagName=lystran-sim-spawn-needed");

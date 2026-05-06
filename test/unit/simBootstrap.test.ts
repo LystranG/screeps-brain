@@ -53,15 +53,80 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
 
     assert.isTrue(firstResult.ran);
     assert.isFalse(firstResult.ready);
-    assert.sameMembers(firstResult.guidanceCodes || [], ["missing-source", "missing-spawn", "missing-creep"]);
-    assert.sameMembers(secondResult.guidanceCodes || [], ["missing-source", "missing-spawn", "missing-creep"]);
-    assert.equal(warn.callCount, 3);
+    assert.sameMembers(firstResult.guidanceCodes || [], [
+      "missing-controller",
+      "missing-source",
+      "missing-spawn",
+      "missing-creep"
+    ]);
+    assert.sameMembers(secondResult.guidanceCodes || [], [
+      "missing-controller",
+      "missing-source",
+      "missing-spawn",
+      "missing-creep"
+    ]);
+    assert.equal(warn.callCount, 4);
     assert.equal(memory.runtime.sim.bootstrap.version, SIM_BOOTSTRAP_VERSION);
     assert.isTrue(memory.runtime.sim.bootstrap.completed);
     assert.isFalse(memory.runtime.sim.bootstrap.ready);
     assert.equal(memory.runtime.sim.bootstrap.lastRunTick, 11);
     assert.equal(memory.runtime.sim.guidance["missing-source"].lastSeenTick, 11);
     assert.equal(memory.runtime.sim.guidance["missing-source"].lastLoggedTick, 10);
+  });
+
+  it("records spawn and source guidance when official sim only has a controller", () => {
+    const game = createMockGame();
+    const memory = createMemoryWithDefaults();
+    const logger = new Logger({}, () => 12);
+    sinon.stub(logger, "warn");
+
+    game.rooms = {
+      W1N1: {
+        controller: {
+          id: "controller-sim",
+          my: true,
+          level: 1
+        },
+        find: () => []
+      }
+    };
+
+    const result = runSimBootstrap(memory, game as unknown as Game, logger, 12);
+
+    assert.includeMembers(result.guidanceCodes || [], ["missing-spawn", "missing-source"]);
+    assert.notInclude(result.guidanceCodes || [], "missing-controller");
+    assert.include(
+      memory.runtime.sim.guidance["missing-spawn"].message ?? "",
+      "runtime code cannot create sources, spawns, or initial creeps"
+    );
+    assert.include(
+      memory.runtime.sim.guidance["missing-source"].message ?? "",
+      "runtime code cannot create sources, spawns, or initial creeps"
+    );
+  });
+
+  it("records controller guidance when sim lacks a controller", () => {
+    const game = createMockGame();
+    const memory = createMemoryWithDefaults();
+    const logger = new Logger({}, () => 13);
+    sinon.stub(logger, "warn");
+
+    game.rooms = {
+      W1N1: {
+        find: () => [{}]
+      }
+    };
+    game.spawns = {
+      Spawn1: {}
+    };
+
+    const result = runSimBootstrap(memory, game as unknown as Game, logger, 13);
+
+    assert.include(result.guidanceCodes || [], "missing-controller");
+    assert.include(
+      memory.runtime.sim.guidance["missing-controller"].message ?? "",
+      "runtime code cannot create sources, spawns, or initial creeps"
+    );
   });
 
   it("marks ready when visible sources and spawns exist", () => {
@@ -130,6 +195,7 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     assert.isTrue(createFlag.calledWith("lystran-sim-source-needed"));
     assert.isTrue(createFlag.calledWith("lystran-sim-spawn-needed"));
     assert.isTrue(createFlag.calledWith("lystran-sim-creep-needed"));
+    assert.isTrue(createFlag.calledWith("lystran-sim-controller-needed"));
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
   });
 
@@ -153,7 +219,7 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     runSimBootstrap(memory, game as unknown as Game, logger, 45);
     runSimBootstrap(memory, game as unknown as Game, logger, 46);
 
-    assert.equal(createFlag.callCount, 3);
+    assert.equal(createFlag.callCount, 4);
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
   });
 

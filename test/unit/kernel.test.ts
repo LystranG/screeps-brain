@@ -347,6 +347,80 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
       assert.include(memory.colonies.W8N8.strategy.reasons, "repair: degraded colony missing spawn, missing source");
       assert.lengthOf(memory.colonies.W8N8.spawnQueue, 0);
     });
+
+    it("records guidance when official sim only has a controller", () => {
+      const game = mockGame();
+      const memory = mockMemory() as Memory;
+
+      game.shard.name = "sim";
+      game.time = 270;
+      game.rooms = {
+        W7N7: createMockRoom({
+          name: "W7N7",
+          controller: { id: "controller-only", my: true, level: 1 },
+          spawns: [],
+          sources: [],
+          creeps: [],
+          constructionSites: [],
+          hostiles: []
+        })
+      };
+      game.spawns = {};
+
+      Object.assign(memory, {
+        ...createDefaultProjectMemorySections(),
+        creeps: {}
+      });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.containsAllKeys(memory.runtime.sim.guidance, ["missing-spawn", "missing-source"]);
+      assert.notProperty(memory.runtime.sim.guidance, "missing-controller");
+      assert.include(
+        memory.runtime.sim.guidance["missing-spawn"].message ?? "",
+        "runtime code cannot create sources, spawns, or initial creeps"
+      );
+      assert.lengthOf(memory.colonies.W7N7.spawnQueue, 0);
+    });
+
+    it("runs sim-ready rooms with spawn source and controller through bootstrap", () => {
+      const game = mockGame();
+      const memory = mockMemory() as Memory;
+      const spawn = createKernelSpawn("SpawnReadySim");
+
+      game.shard.name = "sim";
+      game.time = 280;
+      game.rooms = {
+        W6N6: createMockRoom({
+          name: "W6N6",
+          controller: { id: "controller-ready", my: true, level: 1 },
+          spawns: [spawn],
+          sources: [{ id: "source-ready" }],
+          creeps: [],
+          constructionSites: [],
+          hostiles: [],
+          energyAvailable: 300,
+          energyCapacityAvailable: 300
+        })
+      };
+      game.spawns = {
+        SpawnReadySim: spawn
+      };
+
+      Object.assign(memory, {
+        ...createDefaultProjectMemorySections(),
+        creeps: {}
+      });
+
+      const result = new Kernel().run();
+
+      assert.isTrue(result.ok);
+      assert.equal(memory.colonies.W6N6.status, "ready");
+      assert.equal(memory.processes[ProcessName.bootstrapExecution].lastStatus, "ok");
+      assert.isTrue(memory.colonies.W6N6.spawnQueue.some(request => request.id.indexOf("bootstrap:W6N6:") === 0));
+      assert.deepEqual(Object.keys(memory.runtime.sim.guidance), ["missing-creep"]);
+    });
   });
 
   it("records a failed stage sample and still reaches later lifecycle stages", () => {
