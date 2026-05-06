@@ -4,6 +4,7 @@ import { ColonyContext } from "colony/types";
 import { createDefaultProjectMemorySections, ProjectMemoryShape } from "memory/schema";
 import { buildStrategyPlan, createStrategySignature, shouldRefreshStrategyPlan } from "strategy/planner";
 import { isHighRiskIntent, isIntentAllowed, policyGateForIntent } from "strategy/policy";
+import { runStrategyPlanning } from "strategy/runner";
 
 describe("strategy planner", () => {
   it("maps high-risk deferrals to exact strategy policy gates", () => {
@@ -129,6 +130,51 @@ describe("strategy planner", () => {
       refresh: false,
       trigger: null
     });
+  });
+
+  it("runs per-colony strategy planning and persists refreshed summaries", () => {
+    const context = createStrategyContext();
+    const memory = createProjectMemoryWithExistingPlan(context, 100);
+
+    const result = runStrategyPlanning([context], memory, 150);
+
+    assert.deepEqual(result, {
+      evaluated: 1,
+      refreshed: 1,
+      skipped: 0,
+      errors: []
+    });
+    assert.equal(memory.colonies.W1N1.strategy.lastRunTick, 150);
+    assert.equal(memory.colonies.W1N1.strategy.lastTrigger, "cadence");
+    assert.equal(memory.colonies.W1N1.strategy.signature, createStrategySignature(context, memory));
+  });
+
+  it("keeps the existing strategy object unchanged when refresh is not needed", () => {
+    const context = createStrategyContext();
+    const memory = createProjectMemoryWithExistingPlan(context, 100);
+    const existingStrategy = memory.colonies.W1N1.strategy;
+
+    const result = runStrategyPlanning([context], memory, 120);
+
+    assert.equal(result.evaluated, 1);
+    assert.equal(result.refreshed, 0);
+    assert.equal(result.skipped, 1);
+    assert.lengthOf(result.errors, 0);
+    assert.strictEqual(memory.colonies.W1N1.strategy, existingStrategy);
+  });
+
+  it("skips strategy contexts without existing colony memory", () => {
+    const context = createStrategyContext();
+    const memory = createProjectMemory();
+
+    const result = runStrategyPlanning([context], memory, 100);
+
+    assert.equal(result.evaluated, 1);
+    assert.equal(result.refreshed, 0);
+    assert.equal(result.skipped, 1);
+    assert.lengthOf(result.errors, 1);
+    assert.include(result.errors[0], "W1N1");
+    assert.isUndefined(memory.colonies.W1N1);
   });
 });
 
