@@ -7,6 +7,7 @@ import { createEnvNamespace } from "commands/namespaces/env";
 import { createFutureNamespaces } from "commands/namespaces/future";
 import { createSimNamespace } from "commands/namespaces/sim";
 import { createSpawnNamespace } from "commands/namespaces/spawn";
+import { createStrategyNamespace } from "commands/namespaces/strategy";
 import { recordCommandHistory } from "commands/history";
 
 function errorResult(message: string): CommandResult {
@@ -67,6 +68,7 @@ export function createDefaultCommandRegistry(): CommandRegistry {
     createConfigNamespace(),
     createDebugNamespace(),
     createColonyNamespace(),
+    createStrategyNamespace(),
     ...createFutureNamespaces(),
     createSpawnNamespace()
   ]);
