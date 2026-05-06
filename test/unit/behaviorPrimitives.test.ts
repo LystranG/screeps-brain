@@ -7,6 +7,7 @@ import { ProcessDefinition } from "processes/types";
 import { createDefaultProcessDefinitions, runProcessDefinitions } from "processes/runner";
 import { RuntimeServices } from "runtime/services";
 import { createDefaultRoleRegistry } from "roles/registry";
+import { runCreepTask } from "tasks/executor";
 import { clearTaskMemory, createTaskMemory, TaskStatus, TaskType, validateTaskMemory } from "tasks/model";
 
 describe("behavior primitives task model", () => {
@@ -87,6 +88,136 @@ describe("behavior primitives task model", () => {
       ok: false,
       reason: "Task memory targetId must be a string or null"
     });
+  });
+
+  it("accepts minimal logistics task types at the model boundary", () => {
+    assert.equal(TaskType.pickup, "pickup");
+    assert.equal(TaskType.transfer, "transfer");
+    assert.equal(TaskType.refill, "refill");
+  });
+});
+
+describe("behavior primitives task executor", () => {
+  it("runs harvest tasks and records running OK status", () => {
+    const source = createIdentifiedTarget<Source>("source-1");
+    const creep = createActionCreep(RoleName.worker, 0, 50, { harvest: OK });
+
+    creep.memory.task = createTaskMemory(TaskType.harvest, source.id, 210);
+    const result = runCreepTask(creep, createRoleContext({ sources: [source], tick: 211 }));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "ok",
+      reason: "harvest running"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.running);
+    assert.equal(creep.memory.task.updatedTick, 211);
+    assert.equal(creep.memory.task.result, "OK");
+    assert.isNull(creep.memory.task.failure);
+    assert.deepEqual(creep.actionCalls.map(call => call.action), ["harvest"]);
+  });
+
+  it("moves toward harvest targets that are out of range", () => {
+    const source = createIdentifiedTarget<Source>("source-1");
+    const creep = createActionCreep(RoleName.worker, 0, 50, { harvest: ERR_NOT_IN_RANGE });
+
+    creep.memory.task = createTaskMemory(TaskType.harvest, source.id, 220);
+    const result = runCreepTask(creep, createRoleContext({ sources: [source], tick: 221 }));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "blocked",
+      reason: "harvest moving"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.running);
+    assert.equal(creep.memory.task.result, "ERR_NOT_IN_RANGE");
+    assert.deepEqual(creep.actionCalls.map(call => call.action), ["harvest", "moveTo"]);
+  });
+
+  it("completes harvest tasks when carry becomes full", () => {
+    const source = createIdentifiedTarget<Source>("source-1");
+    const creep = createActionCreep(RoleName.worker, 50, 0, { harvest: OK });
+
+    creep.memory.task = createTaskMemory(TaskType.harvest, source.id, 230);
+    const result = runCreepTask(creep, createRoleContext({ sources: [source], tick: 231 }));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "ok",
+      reason: "harvest complete"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.complete);
+    assert.equal(creep.memory.task.result, "OK");
+  });
+
+  it("executes upgrade tasks and moves toward controllers that are out of range", () => {
+    const controller = createIdentifiedTarget<StructureController>("controller-1");
+    const creep = createActionCreep(RoleName.upgrader, 50, 0, { upgradeController: ERR_NOT_IN_RANGE });
+
+    creep.memory.task = createTaskMemory(TaskType.upgrade, controller.id, 240);
+    const result = runCreepTask(creep, createRoleContext({ controller, tick: 241 }));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "blocked",
+      reason: "upgrade moving"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.running);
+    assert.equal(creep.memory.task.result, "ERR_NOT_IN_RANGE");
+    assert.deepEqual(creep.actionCalls.map(call => call.action), ["upgradeController", "moveTo"]);
+  });
+
+  it("completes upgrade tasks when the creep has no energy", () => {
+    const controller = createIdentifiedTarget<StructureController>("controller-1");
+    const creep = createActionCreep(RoleName.upgrader, 0, 50, { upgradeController: ERR_NOT_ENOUGH_RESOURCES });
+
+    creep.memory.task = createTaskMemory(TaskType.upgrade, controller.id, 250);
+    const result = runCreepTask(creep, createRoleContext({ controller, tick: 251 }));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "ok",
+      reason: "upgrade complete"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.complete);
+    assert.equal(creep.memory.task.result, "ERR_NOT_ENOUGH_RESOURCES");
+  });
+
+  it("fails tasks with an invalid target", () => {
+    const creep = createActionCreep(RoleName.worker);
+
+    creep.memory.task = createTaskMemory(TaskType.harvest, "missing-source", 260);
+    const result = runCreepTask(creep, createRoleContext({ tick: 261 }));
+
+    assert.deepEqual(result, {
+      ok: false,
+      status: "error",
+      reason: "invalid target for harvest: missing-source"
+    });
+    assert.equal(creep.memory.task.status, TaskStatus.failed);
+    assert.equal(creep.memory.task.updatedTick, 261);
+    assert.include(creep.memory.task.failure, "invalid target");
+    assert.deepEqual(creep.actionCalls, []);
+  });
+
+  it("handles minimal logistics task types without throwing", () => {
+    const droppedEnergy = createIdentifiedTarget<Resource>("drop-1");
+    const creep = createActionCreep(RoleName.worker, 0, 50, { pickup: ERR_NOT_IN_RANGE });
+
+    creep.memory.task = createTaskMemory(TaskType.pickup, droppedEnergy.id, 270);
+    const result = runCreepTask(
+      creep,
+      createRoleContext({
+        gameObjects: {
+          [droppedEnergy.id]: droppedEnergy
+        },
+        tick: 271
+      })
+    );
+
+    assert.equal(result.status, "blocked");
+    assert.equal(creep.memory.task.status, TaskStatus.running);
+    assert.deepEqual(creep.actionCalls.map(call => call.action), ["pickup", "moveTo"]);
   });
 });
 
@@ -319,20 +450,42 @@ describe("behavior primitives process runner", () => {
   });
 });
 
-function createRoleContext(): { colony: ColonyContext; services: RuntimeServices; game: Game; tick: number } {
+interface RoleContextOptions {
+  controller?: StructureController | null;
+  sources?: Source[];
+  spawns?: StructureSpawn[];
+  gameObjects?: Record<string, unknown>;
+  tick?: number;
+}
+
+function createRoleContext(options: RoleContextOptions = {}): {
+  colony: ColonyContext;
+  services: RuntimeServices;
+  game: Game;
+  tick: number;
+} {
+  const controller = options.controller ?? null;
+  const sources = options.sources ?? [];
+  const spawns = options.spawns ?? [];
+  const tick = options.tick ?? 200;
+
   return {
     colony: {
       roomName: "W1N1",
       primary: true,
       creeps: [],
-      spawns: [],
-      sources: []
+      spawns,
+      sources,
+      controller
     } as unknown as ColonyContext,
     services: {} as RuntimeServices,
     game: {
-      time: 200
+      time: tick,
+      getObjectById(id: string): unknown {
+        return options.gameObjects?.[id] ?? null;
+      }
     } as Game,
-    tick: 200
+    tick
   };
 }
 
@@ -354,12 +507,29 @@ interface ActionCreep extends Creep {
   actionCalls: ActionCall[];
 }
 
-function createActionCreep(role: string, usedEnergy = 0, freeEnergy = 50): ActionCreep {
+interface ActionReturnCodes {
+  harvest?: ScreepsReturnCode;
+  upgradeController?: ScreepsReturnCode;
+  transfer?: ScreepsReturnCode;
+  pickup?: ScreepsReturnCode;
+  moveTo?: ScreepsReturnCode;
+}
+
+function createActionCreep(
+  role: string,
+  usedEnergy = 0,
+  freeEnergy = 50,
+  actionResults: ActionReturnCodes = {}
+): ActionCreep {
   const actionCalls: ActionCall[] = [];
-  const record = (action: ActionCall["action"], target: { id?: string }, resourceType?: ResourceConstant): OK => {
+  const record = (
+    action: ActionCall["action"],
+    target: { id?: string },
+    resourceType?: ResourceConstant
+  ): ScreepsReturnCode => {
     actionCalls.push({ action, target, resourceType });
 
-    return OK;
+    return actionResults[action] ?? OK;
   };
 
   return {
@@ -387,10 +557,21 @@ function createActionCreep(role: string, usedEnergy = 0, freeEnergy = 50): Actio
       return record("pickup", target);
     },
     moveTo(target: RoomPosition | { pos: RoomPosition }): CreepMoveReturnCode | ERR_NO_PATH | ERR_INVALID_TARGET {
-      return record("moveTo", target as { id?: string });
+      return record("moveTo", target as { id?: string }) as CreepMoveReturnCode | ERR_NO_PATH | ERR_INVALID_TARGET;
     },
     actionCalls
   } as unknown as ActionCreep;
+}
+
+function createIdentifiedTarget<T extends { id: string }>(id: string): T {
+  return {
+    id,
+    pos: {
+      roomName: "W1N1",
+      x: 10,
+      y: 10
+    }
+  } as unknown as T;
 }
 
 function createProcessMemory(processes: Record<string, ProcessMemory> = {}): Memory {

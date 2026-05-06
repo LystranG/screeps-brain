@@ -15,7 +15,10 @@ export const TaskType = {
   noop: "noop",
   harvest: "harvest",
   upgrade: "upgrade",
-  build: "build"
+  build: "build",
+  pickup: "pickup",
+  transfer: "transfer",
+  refill: "refill"
 } as const;
 
 export type TaskTypeName = typeof TaskType[keyof typeof TaskType];
