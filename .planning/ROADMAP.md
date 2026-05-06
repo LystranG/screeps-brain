@@ -93,13 +93,13 @@ Plans:
 
 ## Phase 4: Colony and Behavior Primitives
 
-**Status:** Complete — verified 2026-05-05 with all Phase 4 plans and verification gates passing.
+**Status:** Complete — gap closure completed 2026-05-06; ready for re-verification.
 
 **Goal:** Establish the domain abstractions needed to add behavior without coupling modules to global scans or one-off role logic.
 
 **Requirements:** COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05
 
-**Plans:** 5/5 plans complete
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Add typed Memory and constants foundation for Phase 4 primitives.
@@ -107,6 +107,7 @@ Plans:
 - [x] 04-03-PLAN.md — Add process, role, and task primitives with cadence-aware runner and no-op role skeletons.
 - [x] 04-04-PLAN.md — Add spawn queue, body builder, and dry-run validation primitives.
 - [x] 04-05-PLAN.md — Wire Phase 4 primitives into Kernel and expose read-only colony/spawn command inspection.
+- [x] 04-06-PLAN.md — Close Memory colony repair and spawn validation starvation verifier gaps.
 
 **Success Criteria:**
 1. The system can build a `ColonyContext` for each owned room or sim candidate.
