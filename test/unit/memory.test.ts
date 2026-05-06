@@ -680,6 +680,112 @@ describe("memory migrations", () => {
     });
   });
 
+  it("repairs malformed strategy plan arrays and intent entries", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        colony: {
+          primaryRoomName: "W1N1"
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 30,
+            lastRefreshTick: 30,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 2,
+            sourceIds: ["source1"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl2"
+          },
+          spawnQueue: [],
+          strategy: {
+            version: 1,
+            roomName: "W1N1",
+            stage: "rcl2",
+            status: "fresh",
+            lastRunTick: 30,
+            nextRunTick: 80,
+            lastTrigger: "state-change",
+            signature: "valid",
+            priorities: ["upgrade", 42, null],
+            intents: [
+              {
+                type: "prioritizeUpgrade",
+                priority: 90,
+                status: "allowed",
+                reason: "upgrade",
+                gate: null
+              },
+              {
+                type: "deferExpansion",
+                priority: "bad",
+                status: "allowed",
+                reason: "bad",
+                gate: null
+              },
+              "bad-intent"
+            ],
+            deferrals: [
+              {
+                type: "deferRemoteMining",
+                priority: 10,
+                status: "gated",
+                reason: "remote mining gated",
+                gate: "strategy.allowRemoteMining"
+              },
+              {
+                type: "unknown",
+                priority: 10,
+                status: "gated",
+                reason: "bad",
+                gate: null
+              }
+            ],
+            reasons: ["valid reason", null, 1]
+          }
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.deepEqual(memory.colonies.W1N1.strategy.priorities, ["upgrade"]);
+    assert.deepEqual(memory.colonies.W1N1.strategy.intents, [
+      {
+        type: "prioritizeUpgrade",
+        priority: 90,
+        status: "allowed",
+        reason: "upgrade",
+        gate: null
+      }
+    ]);
+    assert.deepEqual(memory.colonies.W1N1.strategy.deferrals, [
+      {
+        type: "deferRemoteMining",
+        priority: 10,
+        status: "gated",
+        reason: "remote mining gated",
+        gate: "strategy.allowRemoteMining"
+      }
+    ]);
+    assert.deepEqual(memory.colonies.W1N1.strategy.reasons, ["valid reason"]);
+  });
+
   it("preserves legacy CPU stage summaries when migrating to v2", () => {
     const legacyHarvest = {
       last: 2,

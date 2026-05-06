@@ -104,19 +104,20 @@ export function buildStrategyPlan(
   const deferrals: StrategyIntentMemory[] = [];
 
   const stage = deriveStrategyStage(context);
+  const status = derivePlanStatus(context);
 
-  addWorkerCoverageIntent(context, intents, priorities, reasons);
-  addUpgradeIntent(context, intents, priorities, reasons);
-  addConstructionIntent(context, intents, priorities, reasons);
-  addRepairIntent(context, intents, priorities, reasons);
-  addDefenseIntent(context, intents, priorities, reasons);
+  addWorkerCoverageIntent(context, status, intents, priorities, reasons);
+  addUpgradeIntent(context, status, intents, priorities, reasons);
+  addConstructionIntent(context, status, intents, priorities, reasons);
+  addRepairIntent(context, status, intents, priorities, reasons);
+  addDefenseIntent(context, status, intents, priorities, reasons);
   addHighRiskDeferrals(memory, deferrals, reasons);
 
   return {
     version: 1,
     roomName: context.roomName,
     stage,
-    status: "fresh",
+    status,
     lastRunTick: tick,
     nextRunTick: tick + memory.config.strategy.planningCadence,
     lastTrigger: trigger,
@@ -129,6 +130,10 @@ export function buildStrategyPlan(
 }
 
 function deriveStrategyStage(context: ColonyContext): string {
+  if (context.readiness === "error") {
+    return "error";
+  }
+
   if (context.readiness === "degraded") {
     return "degraded";
   }
@@ -140,19 +145,31 @@ function deriveStrategyStage(context: ColonyContext): string {
   return `rcl${context.stage.rcl}`;
 }
 
+function derivePlanStatus(context: ColonyContext): StrategyPlanMemory["status"] {
+  return context.readiness === "ready" ? "fresh" : "blocked";
+}
+
 function addWorkerCoverageIntent(
   context: ColonyContext,
+  status: StrategyPlanMemory["status"],
   intents: StrategyIntentMemory[],
   priorities: string[],
   reasons: string[]
 ): void {
   priorities.push("worker coverage");
+
+  if (status !== "fresh" || !context.stage.hasSpawn || !context.stage.hasSource) {
+    reasons.push("worker coverage: blocked until spawn and source facts are available");
+    return;
+  }
+
   reasons.push(`worker coverage: ${context.stage.creepCount} creeps available for ${context.stage.sourceCount} sources`);
   intents.push(createIntent(StrategyIntentType.maintainWorkerCoverage, 100, "allowed", "maintain worker coverage"));
 }
 
 function addUpgradeIntent(
   context: ColonyContext,
+  status: StrategyPlanMemory["status"],
   intents: StrategyIntentMemory[],
   priorities: string[],
   reasons: string[]
@@ -161,20 +178,29 @@ function addUpgradeIntent(
 
   if (context.stage.hasController && context.stage.rcl !== null) {
     reasons.push(`upgrade: controller RCL ${context.stage.rcl} can progress`);
+    if (status === "fresh") {
+      intents.push(createIntent(StrategyIntentType.prioritizeUpgrade, 90, "allowed", "prioritize controller upgrade"));
+    }
+    return;
   } else {
     reasons.push("upgrade: blocked until controller is visible");
   }
-
-  intents.push(createIntent(StrategyIntentType.prioritizeUpgrade, 90, "allowed", "prioritize controller upgrade"));
 }
 
 function addConstructionIntent(
   context: ColonyContext,
+  status: StrategyPlanMemory["status"],
   intents: StrategyIntentMemory[],
   priorities: string[],
   reasons: string[]
 ): void {
   priorities.push("construction");
+
+  if (status !== "fresh") {
+    reasons.push("construction: blocked until colony is ready");
+    return;
+  }
+
   reasons.push(`construction: ${context.stage.constructionSiteCount} sites visible`);
 
   if (context.stage.constructionSiteCount > 0) {
@@ -184,6 +210,7 @@ function addConstructionIntent(
 
 function addRepairIntent(
   context: ColonyContext,
+  status: StrategyPlanMemory["status"],
   intents: StrategyIntentMemory[],
   priorities: string[],
   reasons: string[]
@@ -196,16 +223,29 @@ function addRepairIntent(
     reasons.push("repair: monitor critical structure hits before assigning repair work");
   }
 
-  intents.push(createIntent(StrategyIntentType.repairCriticalStructures, 60, "allowed", "repair critical structures"));
+  if (status === "fresh") {
+    intents.push(createIntent(StrategyIntentType.repairCriticalStructures, 60, "allowed", "repair critical structures"));
+  }
 }
 
 function addDefenseIntent(
   context: ColonyContext,
+  status: StrategyPlanMemory["status"],
   intents: StrategyIntentMemory[],
   priorities: string[],
   reasons: string[]
 ): void {
   priorities.push("defense");
+
+  if (status !== "fresh") {
+    if (context.stage.hostileCount > 0) {
+      reasons.push(`defense: ${context.stage.hostileCount} hostiles visible`);
+      return;
+    }
+
+    reasons.push("defense: blocked until colony context is ready");
+    return;
+  }
 
   if (context.stage.hostileCount > 0) {
     reasons.push(`defense: ${context.stage.hostileCount} hostiles visible`);
@@ -224,11 +264,16 @@ function addHighRiskDeferrals(
   for (const type of HIGH_RISK_DEFERRALS) {
     const allowed = isIntentAllowed(type, memory.config);
     const gate = policyGateForIntent(type) ?? "strategy.unknown";
-    const status = allowed ? StrategyIntentStatus.allowed : StrategyIntentStatus.gated;
-    const reason = allowed ? `deferral: ${type} allowed by ${gate}` : `deferral: ${type} gated by ${gate}`;
+
+    if (allowed) {
+      reasons.push(`policy: ${type} allowed by ${gate}`);
+      continue;
+    }
+
+    const reason = `deferral: ${type} gated by ${gate}`;
 
     reasons.push(reason);
-    deferrals.push(createIntent(type, 10, status, reason, gate));
+    deferrals.push(createIntent(type, 10, StrategyIntentStatus.gated, reason, gate));
   }
 }
 

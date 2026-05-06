@@ -72,11 +72,56 @@ describe("strategy planner", () => {
     const plan = buildStrategyPlan(context, memory, 200, "manual");
 
     assert.equal(plan.stage, "degraded");
-    assert.equal(plan.status, "fresh");
+    assert.equal(plan.status, "blocked");
     assert.include(plan.reasons, "defense: 1 hostiles visible");
     assert.include(plan.reasons, "upgrade: blocked until controller is visible");
     assert.include(plan.reasons, "repair: degraded colony missing spawn");
-    assertIntent(plan.intents, StrategyIntentType.defenseWatch, "allowed", null);
+    assert.lengthOf(plan.intents, 0);
+  });
+
+  it("does not emit allowed low-risk intents for error or missing critical facts", () => {
+    const memory = createProjectMemory();
+    const context = createStrategyContext({
+      readiness: "error",
+      missingReasons: ["context build failed"],
+      rcl: null,
+      spawnCount: 0,
+      sourceCount: 0,
+      constructionSiteCount: 1,
+      hostileCount: 1,
+      defense: "hostiles"
+    });
+
+    const plan = buildStrategyPlan(context, memory, 250, "state-change");
+
+    assert.equal(plan.stage, "error");
+    assert.equal(plan.status, "blocked");
+    assert.lengthOf(plan.intents, 0);
+    assert.include(plan.reasons, "worker coverage: blocked until spawn and source facts are available");
+    assert.include(plan.reasons, "upgrade: blocked until controller is visible");
+    assert.include(plan.reasons, "construction: blocked until colony is ready");
+    assert.include(plan.reasons, "defense: 1 hostiles visible");
+  });
+
+  it("omits allowed high-risk defer intents from deferrals while keeping policy reasons", () => {
+    const memory = createProjectMemory();
+    const context = createStrategyContext();
+    memory.config.strategy.allowExpansion = true;
+    memory.config.strategy.allowRemoteMining = true;
+
+    const plan = buildStrategyPlan(context, memory, 300, "manual");
+
+    assert.notInclude(
+      plan.deferrals.map(deferral => deferral.type),
+      StrategyIntentType.deferExpansion
+    );
+    assert.notInclude(
+      plan.deferrals.map(deferral => deferral.type),
+      StrategyIntentType.deferRemoteMining
+    );
+    assert.include(plan.reasons, "policy: deferExpansion allowed by strategy.allowExpansion");
+    assert.include(plan.reasons, "policy: deferRemoteMining allowed by strategy.allowRemoteMining");
+    assertIntent(plan.deferrals, StrategyIntentType.deferMarket, "gated", "strategy.allowMarket");
   });
 
   it("refreshes when the colony has no existing strategy plan", () => {
@@ -270,7 +315,7 @@ function createStrategyContext(overrides: Partial<StrategyContextOverrides> = {}
 }
 
 interface StrategyContextOverrides {
-  readiness: "ready" | "degraded";
+  readiness: "ready" | "degraded" | "error";
   missingReasons: string[];
   rcl: number | null;
   spawnCount: number;

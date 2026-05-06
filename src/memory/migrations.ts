@@ -11,6 +11,7 @@ import {
   StrategyPlanMemory,
   createDefaultProjectMemorySections
 } from "memory/schema";
+import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
 
 export type MigrationResult = { ok: true; version: typeof CURRENT_MEMORY_VERSION } | { ok: false; reason: string };
 
@@ -412,6 +413,7 @@ export function repairStrategyPlan(
   existingPlan: PartialStrategyPlanMemory | undefined
 ): StrategyPlanMemory {
   const plan = existingPlan ?? {};
+  const reasons = repairStringList(plan.reasons);
 
   return {
     version: typeof plan.version === "number" ? plan.version : 1,
@@ -422,11 +424,63 @@ export function repairStrategyPlan(
     nextRunTick: typeof plan.nextRunTick === "number" ? plan.nextRunTick : 0,
     lastTrigger: typeof plan.lastTrigger === "string" ? plan.lastTrigger : "migration",
     signature: typeof plan.signature === "string" ? plan.signature : "",
-    priorities: Array.isArray(plan.priorities) ? plan.priorities : [],
-    intents: Array.isArray(plan.intents) ? plan.intents : [],
-    deferrals: Array.isArray(plan.deferrals) ? plan.deferrals : [],
-    reasons: Array.isArray(plan.reasons) && plan.reasons.length > 0 ? plan.reasons : ["strategy pending evaluation"]
+    priorities: repairStringList(plan.priorities),
+    intents: repairStrategyIntentList(plan.intents),
+    deferrals: repairStrategyIntentList(plan.deferrals),
+    reasons: reasons.length > 0 ? reasons : ["strategy pending evaluation"]
   };
+}
+
+function repairStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function repairStrategyIntentList(value: unknown): StrategyPlanMemory["intents"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isStrategyIntentMemory);
+}
+
+function isStrategyIntentMemory(value: unknown): value is StrategyPlanMemory["intents"][number] {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<StrategyPlanMemory["intents"][number]>;
+
+  return (
+    isStrategyIntentType(candidate.type) &&
+    typeof candidate.priority === "number" &&
+    isFinite(candidate.priority) &&
+    isStrategyIntentStatus(candidate.status) &&
+    typeof candidate.reason === "string" &&
+    (candidate.gate === null || typeof candidate.gate === "string")
+  );
+}
+
+function isStrategyIntentType(value: unknown): value is StrategyIntentType {
+  return (
+    value === StrategyIntentType.maintainWorkerCoverage ||
+    value === StrategyIntentType.prioritizeUpgrade ||
+    value === StrategyIntentType.allowBasicConstruction ||
+    value === StrategyIntentType.repairCriticalStructures ||
+    value === StrategyIntentType.defenseWatch ||
+    value === StrategyIntentType.deferExpansion ||
+    value === StrategyIntentType.deferRemoteMining ||
+    value === StrategyIntentType.deferMarket ||
+    value === StrategyIntentType.deferWarfare ||
+    value === StrategyIntentType.deferLargeFortification
+  );
+}
+
+function isStrategyIntentStatus(value: unknown): value is StrategyIntentStatus {
+  return (
+    value === StrategyIntentStatus.allowed ||
+    value === StrategyIntentStatus.gated ||
+    value === StrategyIntentStatus.deferred
+  );
 }
 
 function repairColonyIntel(
