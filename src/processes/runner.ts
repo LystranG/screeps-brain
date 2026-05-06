@@ -1,3 +1,4 @@
+import { runBootstrapExecution } from "bootstrap/runner";
 import { ProcessDefinition, ProcessDefinitionResult, ProcessRunResult, ProcessRunnerContext } from "processes/types";
 import { RoleRegistry, createDefaultRoleRegistry } from "roles/registry";
 import { ColonyContext } from "colony/types";
@@ -53,6 +54,21 @@ export function createDefaultProcessDefinitions(roleRegistry: RoleRegistry = cre
         return {
           status: "ok",
           message: `strategy refreshed=${summary.refreshed} skipped=${summary.skipped} errors=${summary.errors.length}`
+        };
+      }
+    },
+    {
+      id: ProcessName.bootstrapExecution,
+      name: ProcessName.bootstrapExecution,
+      enabled: true,
+      priority: 18,
+      cadence: 1,
+      run(context: ProcessRunnerContext): ProcessDefinitionResult {
+        const summary = runBootstrapExecution(context.contexts, context.memory, context.tick);
+
+        return {
+          status: "ok",
+          message: `bootstrap colonies=${summary.colonies} slots=${summary.slots} spawn=${summary.spawnRequestsCreated} duplicate=${summary.spawnRequestsDuplicate} tasks=${summary.tasksAssigned} blocked=${summary.blocked}`
         };
       }
     },

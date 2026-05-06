@@ -223,7 +223,48 @@ describe("behavior primitives process runner", () => {
     const calls: string[] = [];
     const colony = {
       roomName: "W1N1",
-      creeps: [createNoopCreep(RoleName.worker), createNoopCreep("miner")]
+      primary: true,
+      readiness: "degraded",
+      missingReasons: ["missing spawn", "missing source", "missing controller"],
+      room: { name: "W1N1" },
+      controller: null,
+      spawns: [],
+      sources: [],
+      creeps: [createNoopCreep(RoleName.worker), createNoopCreep("miner")],
+      constructionSites: [],
+      hostiles: [],
+      energy: {
+        available: 0,
+        capacity: 0,
+        spawnCapacity: 0
+      },
+      stage: {
+        rcl: null,
+        spawnCount: 0,
+        sourceCount: 0,
+        creepCount: 2,
+        constructionSiteCount: 0,
+        hostileCount: 0,
+        hasSpawn: false,
+        hasSource: false,
+        hasController: false,
+        defense: "clear"
+      },
+      intel: {
+        roomName: "W1N1",
+        spawns: [],
+        sources: [],
+        creeps: [],
+        constructionSites: [],
+        hostiles: [],
+        controller: null,
+        energy: {
+          available: 0,
+          capacity: 0,
+          spawnCapacity: 0
+        },
+        scannedTick: 120
+      }
     } as unknown as ColonyContext;
     const roleRegistry = {
       run(roleName: string): { ok: boolean; status: "blocked"; reason: string } {
@@ -243,7 +284,7 @@ describe("behavior primitives process runner", () => {
 
     assert.deepEqual(
       definitions.map((definition: { id: string }) => definition.id),
-      [ProcessName.colonyIntel, ProcessName.strategyPlanning, ProcessName.creepRoles]
+      [ProcessName.colonyIntel, ProcessName.strategyPlanning, ProcessName.bootstrapExecution, ProcessName.creepRoles]
     );
     const creepRolesResult = results.find(result => result.processId === ProcessName.creepRoles);
 

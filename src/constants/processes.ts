@@ -9,6 +9,7 @@ export const ProcessName = {
   spawn: "spawn",
   spawnValidation: "spawnValidation",
   strategyPlanning: "strategyPlanning",
+  bootstrapExecution: "bootstrapExecution",
   cleanup: "cleanup",
   stats: "stats"
 } as const;
