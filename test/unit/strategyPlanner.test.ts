@@ -2,7 +2,7 @@ import { assert } from "chai";
 import { StrategyIntentType } from "constants/strategy";
 import { ColonyContext } from "colony/types";
 import { createDefaultProjectMemorySections, ProjectMemoryShape } from "memory/schema";
-import { buildStrategyPlan, createStrategySignature } from "strategy/planner";
+import { buildStrategyPlan, createStrategySignature, shouldRefreshStrategyPlan } from "strategy/planner";
 import { isHighRiskIntent, isIntentAllowed, policyGateForIntent } from "strategy/policy";
 
 describe("strategy planner", () => {
@@ -77,6 +77,59 @@ describe("strategy planner", () => {
     assert.include(plan.reasons, "repair: degraded colony missing spawn");
     assertIntent(plan.intents, StrategyIntentType.defenseWatch, "allowed", null);
   });
+
+  it("refreshes when the colony has no existing strategy plan", () => {
+    const memory = createProjectMemory();
+    const context = createStrategyContext();
+
+    assert.deepEqual(shouldRefreshStrategyPlan(context, memory, 100), {
+      refresh: true,
+      trigger: "missing-plan"
+    });
+  });
+
+  it("refreshes on planning cadence even when the signature is unchanged", () => {
+    const memory = createProjectMemoryWithExistingPlan(createStrategyContext(), 100);
+    const context = createStrategyContext();
+
+    assert.equal(memory.config.strategy.planningCadence, 50);
+    assert.deepEqual(shouldRefreshStrategyPlan(context, memory, 150), {
+      refresh: true,
+      trigger: "cadence"
+    });
+  });
+
+  it("refreshes before cadence when RCL changes the strategy signature", () => {
+    const originalContext = createStrategyContext({ rcl: 1 });
+    const memory = createProjectMemoryWithExistingPlan(originalContext, 100);
+    const changedContext = createStrategyContext({ rcl: 2 });
+
+    assert.deepEqual(shouldRefreshStrategyPlan(changedContext, memory, 120), {
+      refresh: true,
+      trigger: "state-change"
+    });
+  });
+
+  it("refreshes before cadence when hostiles change the strategy signature", () => {
+    const originalContext = createStrategyContext({ hostileCount: 0, defense: "clear" });
+    const memory = createProjectMemoryWithExistingPlan(originalContext, 100);
+    const changedContext = createStrategyContext({ hostileCount: 2, defense: "hostiles" });
+
+    assert.deepEqual(shouldRefreshStrategyPlan(changedContext, memory, 120), {
+      refresh: true,
+      trigger: "state-change"
+    });
+  });
+
+  it("does not refresh before cadence when the strategy signature is unchanged", () => {
+    const context = createStrategyContext();
+    const memory = createProjectMemoryWithExistingPlan(context, 100);
+
+    assert.deepEqual(shouldRefreshStrategyPlan(context, memory, 120), {
+      refresh: false,
+      trigger: null
+    });
+  });
 });
 
 function createProjectMemory(): ProjectMemoryShape {
@@ -84,6 +137,34 @@ function createProjectMemory(): ProjectMemoryShape {
     ...createDefaultProjectMemorySections(),
     creeps: {}
   };
+}
+
+function createProjectMemoryWithExistingPlan(context: ColonyContext, tick: number): ProjectMemoryShape {
+  const memory = createProjectMemory();
+  const strategy = buildStrategyPlan(context, memory, tick, "missing-plan");
+
+  memory.colonies[context.roomName] = {
+    roomName: context.roomName,
+    primary: context.primary,
+    status: context.readiness,
+    intel: {
+      roomName: context.roomName,
+      lastSeenTick: tick,
+      lastRefreshTick: tick,
+      status: context.readiness,
+      missingReasons: context.missingReasons,
+      controllerId: null,
+      rcl: context.stage.rcl,
+      sourceIds: [],
+      spawnIds: [],
+      primary: context.primary,
+      stage: strategy.stage
+    },
+    spawnQueue: [],
+    strategy
+  };
+
+  return memory;
 }
 
 function createStrategyContext(overrides: Partial<StrategyContextOverrides> = {}): ColonyContext {
