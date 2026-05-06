@@ -1,4 +1,4 @@
-import { CommandContext, CommandNamespaceDefinition, CommandResult } from "commands/types";
+import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
 import { StrategyIntentMemory, StrategyPlanMemory } from "memory/schema";
 
