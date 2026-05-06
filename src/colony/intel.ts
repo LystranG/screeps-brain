@@ -1,4 +1,4 @@
-import { ColonyIntelMemory, ColonyMemory } from "memory/schema";
+import { ColonyIntelMemory, ColonyMemory, createDefaultStrategyPlanMemory } from "memory/schema";
 import { VolatileRoomIntel } from "colony/types";
 
 export function buildVolatileRoomIntel(room: Room, game: Game): VolatileRoomIntel {
@@ -64,7 +64,8 @@ export function persistColonyIntel(
     primary: next.primary,
     status: next.status,
     intel: next,
-    spawnQueue: previousColony?.spawnQueue ?? []
+    spawnQueue: previousColony?.spawnQueue ?? [],
+    strategy: previousColony?.strategy ?? createDefaultStrategyPlanMemory(roomName, "intel")
   };
 
   memory.colonies[roomName] = colony;

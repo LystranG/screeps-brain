@@ -2,7 +2,7 @@ import { assert } from "chai";
 import { buildColonyContexts } from "colony/context";
 import { buildVolatileRoomIntel, persistColonyIntel, shouldPersistIntel } from "colony/intel";
 import { ColonyContext, ColonyReadiness, VolatileRoomIntel } from "colony/types";
-import { ColonyIntelMemory, createDefaultProjectMemorySections } from "memory/schema";
+import { ColonyIntelMemory, createDefaultProjectMemorySections, createDefaultStrategyPlanMemory } from "memory/schema";
 import { createMockGame, createMockRoom } from "./mock";
 
 describe("colony context types", () => {
@@ -121,7 +121,8 @@ describe("room intel", () => {
       primary: previous.primary,
       status: previous.status,
       intel: previous,
-      spawnQueue: []
+      spawnQueue: [],
+      strategy: createDefaultStrategyPlanMemory("W1N1", "test")
     };
 
     assert.isFalse(persistColonyIntel(memory, "W1N1", unchanged, 20));

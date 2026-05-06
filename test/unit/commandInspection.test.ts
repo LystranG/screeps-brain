@@ -9,7 +9,7 @@ import { createColonyNamespace } from "commands/namespaces/colony";
 import { createSimNamespace } from "commands/namespaces/sim";
 import { createSpawnNamespace } from "commands/namespaces/spawn";
 import { createDefaultCommandRegistry } from "commands/registry";
-import { createDefaultProjectMemorySections } from "memory/schema";
+import { createDefaultProjectMemorySections, createDefaultStrategyPlanMemory } from "memory/schema";
 import { createMockGame, createMockRoom } from "./mock";
 
 describe("command inspection|env|sim", () => {
@@ -417,7 +417,8 @@ describe("command inspection|spawn", () => {
           attempts: 1,
           lastError: "-6"
         }
-      ]
+      ],
+      strategy: createDefaultStrategyPlanMemory("W1N1", "test")
     };
     memory.colonies.W2N2 = {
       roomName: "W2N2",
@@ -450,7 +451,8 @@ describe("command inspection|spawn", () => {
           attempts: 0,
           lastError: "missing spawn"
         }
-      ]
+      ],
+      strategy: createDefaultStrategyPlanMemory("W2N2", "test")
     };
 
     return memory;

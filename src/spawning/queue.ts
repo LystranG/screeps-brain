@@ -1,4 +1,4 @@
-import { ColonyMemory, ProjectMemoryShape, SpawnRequestMemory } from "memory/schema";
+import { ColonyMemory, ProjectMemoryShape, SpawnRequestMemory, createDefaultStrategyPlanMemory } from "memory/schema";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { calculateBodyCost } from "spawning/bodyBuilder";
@@ -287,7 +287,8 @@ function ensureColony(memory: ProjectMemoryShape, roomName: string): ColonyMemor
       primary: memory.config.colony.primaryRoomName === roomName,
       stage: "unknown"
     },
-    spawnQueue: []
+    spawnQueue: [],
+    strategy: createDefaultStrategyPlanMemory(roomName, "spawnQueue")
   };
 
   return memory.colonies[roomName];

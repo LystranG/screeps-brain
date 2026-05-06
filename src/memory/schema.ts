@@ -1,6 +1,7 @@
 import { RoleName } from "constants/roles";
+import type { StrategyIntentStatus, StrategyIntentType, StrategyMode } from "constants/strategy";
 
-export const CURRENT_MEMORY_VERSION = 3;
+export const CURRENT_MEMORY_VERSION = 4;
 
 export interface LogNamespaceConfigMemory {
   enabled?: boolean;
@@ -91,6 +92,29 @@ export interface TaskMemory {
   failure: string | null;
 }
 
+export interface StrategyIntentMemory {
+  type: StrategyIntentType;
+  priority: number;
+  status: StrategyIntentStatus;
+  reason: string;
+  gate: string | null;
+}
+
+export interface StrategyPlanMemory {
+  version: number;
+  roomName: string;
+  stage: string;
+  status: "fresh" | "stale" | "blocked";
+  lastRunTick: number;
+  nextRunTick: number;
+  lastTrigger: string;
+  signature: string;
+  priorities: string[];
+  intents: StrategyIntentMemory[];
+  deferrals: StrategyIntentMemory[];
+  reasons: string[];
+}
+
 export interface SpawnRequestMemory {
   id: string;
   roomName: string;
@@ -111,6 +135,7 @@ export interface ColonyMemory {
   status: ColonyStatusMemory;
   intel: ColonyIntelMemory;
   spawnQueue: SpawnRequestMemory[];
+  strategy: StrategyPlanMemory;
 }
 
 export interface ProcessMemory {
@@ -131,9 +156,13 @@ export interface ProjectConfigMemory {
     mode: "manual";
   };
   strategy: {
-    mode: "manual";
+    mode: StrategyMode;
+    planningCadence: number;
     allowExpansion: boolean;
     allowRemoteMining: boolean;
+    allowMarket: boolean;
+    allowWarfare: boolean;
+    allowLargeFortification: boolean;
   };
   construction: {
     enabled: boolean;
@@ -185,6 +214,26 @@ export interface ProjectMemoryShape {
 }
 
 /**
+ * 创建 JSON-only 的默认策略摘要；运行时只持久化解释和 intent 描述，不保存 live Screeps 对象。
+ */
+export function createDefaultStrategyPlanMemory(roomName: string, trigger: string): StrategyPlanMemory {
+  return {
+    version: 1,
+    roomName,
+    stage: "unknown",
+    status: "stale",
+    lastRunTick: 0,
+    nextRunTick: 0,
+    lastTrigger: trigger,
+    signature: "",
+    priorities: [],
+    intents: [],
+    deferrals: [],
+    reasons: ["strategy pending evaluation"]
+  };
+}
+
+/**
  * 创建除 `creeps` 外的项目 Memory 默认结构；`creeps` 由 Screeps 和迁移流程单独保留。
  */
 export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "creeps"> {
@@ -217,8 +266,12 @@ export function createDefaultProjectMemorySections(): Omit<ProjectMemoryShape, "
       },
       strategy: {
         mode: "manual",
+        planningCadence: 50,
         allowExpansion: false,
-        allowRemoteMining: false
+        allowRemoteMining: false,
+        allowMarket: false,
+        allowWarfare: false,
+        allowLargeFortification: false
       },
       construction: {
         enabled: false,
