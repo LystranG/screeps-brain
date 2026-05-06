@@ -4,6 +4,7 @@ import { ColonyContext } from "colony/types";
 import { ProcessMemory } from "memory/schema";
 import { ProcessName } from "constants/processes";
 import { RuntimeServices } from "runtime/services";
+import { runStrategyPlanning } from "strategy/runner";
 
 export function runProcessDefinitions(
   contexts: readonly ColonyContext[],
@@ -37,6 +38,21 @@ export function createDefaultProcessDefinitions(roleRegistry: RoleRegistry = cre
         return {
           status: "ok",
           message: `observed ${context.contexts.length} colonies`
+        };
+      }
+    },
+    {
+      id: ProcessName.strategyPlanning,
+      name: ProcessName.strategyPlanning,
+      enabled: true,
+      priority: 15,
+      cadence: 1,
+      run(context: ProcessRunnerContext): ProcessDefinitionResult {
+        const summary = runStrategyPlanning(context.contexts, context.memory, context.tick);
+
+        return {
+          status: "ok",
+          message: `strategy refreshed=${summary.refreshed} skipped=${summary.skipped} errors=${summary.errors.length}`
         };
       }
     },
