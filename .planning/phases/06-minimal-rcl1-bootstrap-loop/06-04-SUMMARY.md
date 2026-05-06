@@ -146,6 +146,7 @@ No unmodeled runtime threat surface was introduced. The new execution boundary r
 
 ## Verification
 
+- `rtk npm run test-unit -- --grep "bootstrap execution|spawn primitives|kernel bootstrap matrix"` - PASS after code-review blocker fixes; 37 focused tests.
 - `rtk npm run test-unit -- --grep "kernel.*bootstrap|kernel strategy sim handoff|default lifecycle"` - PASS before recovery, Task 1 scope.
 - `rtk npm run test-unit -- --grep "sim.*bootstrap|kernel strategy sim handoff|kernel.*bootstrap"` - PASS, 35 tests after Task 3 recovery.
 - `rtk npm run test-unit -- --grep "kernel bootstrap matrix"` - PASS, 9 tests.
@@ -156,6 +157,10 @@ No unmodeled runtime threat surface was introduced. The new execution boundary r
 - `rtk proxy sh -c '! rtk rg -n "screeps\\.json" src test/unit --glob "!test/unit/commandCore.test.ts" --glob "!test/unit/commandInspection.test.ts"'` - PASS; the only remaining matches are negative security tests in `test/unit/commandCore.test.ts` and `test/unit/commandInspection.test.ts`.
 - `rtk proxy sh -c '! rtk rg -n "spawnCreep" src test/unit --glob "!src/spawning/runner.ts" --glob "!src/commands/namespaces/spawn.ts" --glob "!test/unit/mock.ts" --glob "!test/unit/spawnPrimitives.test.ts" --glob "!test/unit/kernel.test.ts" --glob "!test/unit/commandInspection.test.ts"'` - PASS; the allowlist includes the existing read-only dry-run command test.
 - `rtk graphify update .` - PASS, graph regenerated after final source edits.
+
+## Code Review Closure
+
+Phase 06 review blockers CR-01, CR-02, and CR-03 are resolved in follow-up fix commit `f7facf8`, also recorded in `06-REVIEW.md`. Bootstrap terminal slot requests can be replaced, spawn demand respects the missing target population, and recoverable dry-run spawn failures now wait without consuming attempts.
 
 ### Verification Blocked
 
