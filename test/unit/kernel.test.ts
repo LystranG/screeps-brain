@@ -177,7 +177,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     ]);
   });
 
-  it("runs colony context, process definitions, and dry-run spawning in the default lifecycle", () => {
+  it("runs colony context, process definitions, and real spawning in the default lifecycle", () => {
     const game = mockGame();
     const memory = mockMemory() as Memory;
     const spawn = createKernelSpawn("SpawnPrimary");
@@ -189,7 +189,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
         controller: { id: "controller-primary", my: true, level: 2 },
         spawns: [spawn],
         sources: [{ id: "source-a" }],
-        creeps: [{ name: "Worker1", memory: { role: "worker" } }],
+        creeps: [],
         constructionSites: [],
         hostiles: [],
         energyAvailable: 300,
@@ -234,14 +234,14 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
       },
       spawnQueue: [
         createSpawnRequest({
-        id: "spawn-worker-200",
-        roomName: "W1N1",
-        role: "worker",
-        priority: 1,
-        body: ["work", "carry", "move"],
-        memory: { role: "worker" } as CreepMemory,
-        reason: "kernel dry-run validation",
-        requestedTick: 199
+          id: "spawn-worker-200",
+          roomName: "W1N1",
+          role: "worker",
+          priority: 1,
+          body: ["work", "carry", "move"],
+          memory: { role: "worker" } as CreepMemory,
+          reason: "kernel dry-run validation",
+          requestedTick: 199
         })
       ],
       strategy: createDefaultStrategyPlanMemory("W1N1", "test")
@@ -257,13 +257,24 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.processes.colonyIntel.lastRunTick, 200);
     assert.equal(memory.processes[ProcessName.strategyPlanning].lastRunTick, 200);
     assert.include(memory.processes[ProcessName.strategyPlanning].lastResult ?? "", "strategy refreshed=");
+    assert.equal((memory.processes[ProcessName.bootstrapExecution] as ProcessMemoryWithStatus).lastStatus, "ok");
+    assert.equal(memory.processes[ProcessName.bootstrapExecution].lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastRunTick, 200);
     assert.equal(memory.processes.creepRoles.lastResult, "creep roles dispatched");
-    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "validated");
-    assert.deepEqual(spawn.calls[0].options, {
-      memory: { role: "worker" },
-      dryRun: true
-    });
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "spawning");
+    assert.isTrue(memory.colonies.W1N1.spawnQueue.some(request => request.id.indexOf("bootstrap:W1N1:") === 0));
+    assert.deepEqual(
+      spawn.calls.map(call => call.options),
+      [
+        {
+          memory: { role: "worker" },
+          dryRun: true
+        },
+        {
+          memory: { role: "worker" }
+        }
+      ]
+    );
   });
 
   describe("kernel strategy sim handoff", () => {
@@ -304,7 +315,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
       assert.equal(memory.colonies.W9N9.status, "ready");
       assert.equal(memory.colonies.W9N9.strategy.lastRunTick, 250);
       assert.equal(memory.processes[ProcessName.strategyPlanning].lastResult, "strategy refreshed=1 skipped=0 errors=0");
-      assert.lengthOf(memory.colonies.W9N9.spawnQueue, 0);
+      assert.isTrue(memory.colonies.W9N9.spawnQueue.some(request => request.id.indexOf("bootstrap:W9N9:") === 0));
     });
 
     it("runs degraded sim rooms through normal path without creating spawn queue entries", () => {
@@ -469,6 +480,10 @@ interface KernelSpawn extends StructureSpawn {
     name: string;
     options: SpawnOptions;
   }>;
+}
+
+interface ProcessMemoryWithStatus {
+  lastStatus?: string;
 }
 
 function createKernelSpawn(name: string): KernelSpawn {
