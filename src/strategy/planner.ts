@@ -2,7 +2,7 @@ import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
 import type { ColonyContext } from "colony/types";
 import type { ProjectMemoryShape, StrategyIntentMemory, StrategyPlanMemory } from "memory/schema";
 import { isIntentAllowed, policyGateForIntent } from "strategy/policy";
-import type { StrategyTrigger } from "strategy/types";
+import type { StrategyRefreshDecision, StrategyTrigger } from "strategy/types";
 
 interface SignatureShape {
   readiness: string;
@@ -50,6 +50,43 @@ export function createStrategySignature(context: ColonyContext, memory: ProjectM
   };
 
   return JSON.stringify(signature);
+}
+
+/**
+ * cadence 限制常规重算频率，signature 变更则保证关键状态或政策变化不会等到下一轮周期。
+ */
+export function shouldRefreshStrategyPlan(
+  context: ColonyContext,
+  memory: ProjectMemoryShape,
+  tick: number
+): StrategyRefreshDecision {
+  const existingPlan = memory.colonies[context.roomName]?.strategy;
+
+  if (!existingPlan) {
+    return {
+      refresh: true,
+      trigger: "missing-plan"
+    };
+  }
+
+  if (tick >= existingPlan.nextRunTick) {
+    return {
+      refresh: true,
+      trigger: "cadence"
+    };
+  }
+
+  if (createStrategySignature(context, memory) !== existingPlan.signature) {
+    return {
+      refresh: true,
+      trigger: "state-change"
+    };
+  }
+
+  return {
+    refresh: false,
+    trigger: null
+  };
 }
 
 /**
