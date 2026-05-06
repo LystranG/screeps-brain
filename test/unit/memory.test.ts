@@ -33,10 +33,28 @@ describe("memory migrations", () => {
     };
 
     assert.isTrue(result.ok);
-    assert.equal(memory.version, 3);
+    assert.equal(memory.version, CURRENT_MEMORY_VERSION);
     assert.deepEqual(config.colony, {
       primaryRoomName: null,
       intelRefreshCadence: 50
+    });
+  });
+
+  it("initializes Phase 5 strategy config defaults in project memory", () => {
+    const memory = {} as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.version, 4);
+    assert.deepEqual(memory.config.strategy, {
+      mode: "manual",
+      planningCadence: 50,
+      allowExpansion: false,
+      allowRemoteMining: false,
+      allowMarket: false,
+      allowWarfare: false,
+      allowLargeFortification: false
     });
   });
 
@@ -262,7 +280,7 @@ describe("memory migrations", () => {
     });
   });
 
-  it("upgrades v2 memory to v3 while preserving colony and process entries", () => {
+  it("upgrades v2 memory to v4 while preserving colony and process entries", () => {
     const colonyMemory = {
       roomName: "W1N1",
       primary: true,
@@ -379,7 +397,21 @@ describe("memory migrations", () => {
       primaryRoomName: "W1N1",
       intelRefreshCadence: 50
     });
-    assert.deepEqual(memory.colonies.W1N1 as unknown, colonyMemory);
+    assert.deepInclude(memory.colonies.W1N1 as unknown as Record<string, unknown>, colonyMemory);
+    assert.deepEqual(memory.colonies.W1N1.strategy, {
+      version: 1,
+      roomName: "W1N1",
+      stage: "unknown",
+      status: "stale",
+      lastRunTick: 0,
+      nextRunTick: 0,
+      lastTrigger: "migration",
+      signature: "",
+      priorities: [],
+      intents: [],
+      deferrals: [],
+      reasons: ["strategy pending evaluation"]
+    });
     assert.deepEqual(memory.processes["process-1"] as unknown, processMemory);
     assert.deepEqual(memory.commands.queue, [{ command: "status" }]);
     assert.deepEqual(memory.commands.history, [{ command: "help" }]);
@@ -433,6 +465,118 @@ describe("memory migrations", () => {
     assert.equal(memory.colonies.W1N1.intel.controllerId, "controller1");
   });
 
+  it("migrateToVersion4 upgrades v3 memory while preserving colony intel and spawnQueue", () => {
+    const spawnQueue = [
+      {
+        id: "spawn-request-1",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 10,
+        body: ["work", "carry", "move"],
+        memory: {
+          role: "worker"
+        },
+        reason: "bootstrap",
+        requestedTick: 20,
+        status: "queued",
+        attempts: 0,
+        lastError: null
+      }
+    ];
+    const memory = {
+      version: 3,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: 3,
+        migrationError: null,
+        environment: {
+          type: "sim",
+          shard: "sim",
+          lastChangedTick: 1,
+          lastSeenTick: 20
+        },
+        sim: {
+          bootstrap: {
+            version: 1,
+            completed: true,
+            ready: true,
+            lastRunTick: 20
+          },
+          guidance: {}
+        }
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        strategy: {
+          mode: "manual",
+          allowExpansion: true,
+          allowRemoteMining: false
+        },
+        colony: {
+          primaryRoomName: "W1N1",
+          intelRefreshCadence: 40
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 20,
+            lastRefreshTick: 20,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 2,
+            sourceIds: ["source1"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl2"
+          },
+          spawnQueue
+        }
+      },
+      processes: {},
+      commands: {
+        queue: [],
+        history: []
+      },
+      stats: {
+        ticks: 20,
+        cpu: {
+          available: true,
+          stages: {}
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.version, 4);
+    assert.equal(memory.runtime.lastMigration, 4);
+    assert.deepEqual(memory.config.strategy, {
+      mode: "manual",
+      planningCadence: 50,
+      allowExpansion: true,
+      allowRemoteMining: false,
+      allowMarket: false,
+      allowWarfare: false,
+      allowLargeFortification: false
+    });
+    assert.deepEqual(memory.colonies.W1N1.intel.sourceIds, ["source1"]);
+    assert.deepEqual(memory.colonies.W1N1.spawnQueue as unknown, spawnQueue);
+    assert.equal(memory.colonies.W1N1.strategy.status, "stale");
+    assert.equal(memory.colonies.W1N1.strategy.lastTrigger, "migration");
+    assert.include(memory.colonies.W1N1.strategy.reasons, "strategy pending evaluation");
+  });
+
   it("repairs current-version colony records to safe degraded defaults", () => {
     const memory = {
       version: CURRENT_MEMORY_VERSION,
@@ -464,6 +608,76 @@ describe("memory migrations", () => {
     assert.isArray(memory.colonies.W2N2.intel.missingReasons);
     assert.deepEqual(memory.colonies.W2N2.intel.missingReasons, []);
     assert.isTrue(memory.colonies.W2N2.primary);
+  });
+
+  it("repairs current-version strategy gates and missing colony strategy plans", () => {
+    const memory = {
+      version: CURRENT_MEMORY_VERSION,
+      runtime: {
+        bootstrapped: true,
+        lastMigration: CURRENT_MEMORY_VERSION,
+        migrationError: null
+      },
+      config: {
+        automation: {
+          enabled: true,
+          mode: "manual"
+        },
+        strategy: {
+          mode: "manual",
+          planningCadence: 25,
+          allowExpansion: true,
+          allowRemoteMining: true
+        },
+        colony: {
+          primaryRoomName: "W1N1"
+        }
+      },
+      colonies: {
+        W1N1: {
+          roomName: "W1N1",
+          primary: true,
+          status: "ready",
+          intel: {
+            roomName: "W1N1",
+            lastSeenTick: 30,
+            lastRefreshTick: 30,
+            status: "ready",
+            missingReasons: [],
+            controllerId: "controller1",
+            rcl: 2,
+            sourceIds: ["source1"],
+            spawnIds: ["spawn1"],
+            primary: true,
+            stage: "rcl2"
+          },
+          spawnQueue: []
+        }
+      },
+      creeps: {}
+    } as unknown as Memory;
+
+    const result = runMemoryMigrations(memory);
+
+    assert.deepEqual(result, { ok: true, version: CURRENT_MEMORY_VERSION });
+    assert.equal(memory.config.strategy.planningCadence, 25);
+    assert.isFalse(memory.config.strategy.allowMarket);
+    assert.isFalse(memory.config.strategy.allowWarfare);
+    assert.isFalse(memory.config.strategy.allowLargeFortification);
+    assert.deepEqual(memory.colonies.W1N1.strategy, {
+      version: 1,
+      roomName: "W1N1",
+      stage: "unknown",
+      status: "stale",
+      lastRunTick: 0,
+      nextRunTick: 0,
+      lastTrigger: "migration",
+      signature: "",
+      priorities: [],
+      intents: [],
+      deferrals: [],
+      reasons: ["strategy pending evaluation"]
+    });
   });
 
   it("preserves legacy CPU stage summaries when migrating to v2", () => {

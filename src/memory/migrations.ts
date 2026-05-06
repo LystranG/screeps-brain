@@ -8,6 +8,7 @@ import {
   ProjectConfigMemory,
   RuntimeMemory,
   StatsMemory,
+  StrategyPlanMemory,
   createDefaultProjectMemorySections
 } from "memory/schema";
 
@@ -18,11 +19,13 @@ type LegacyRuntimeMemory = Partial<Omit<RuntimeMemory, "environment" | "sim">>;
 type LegacyConfigMemory = Partial<Omit<ProjectConfigMemory, "observability">>;
 type LegacyStatsMemory = Partial<Omit<StatsMemory, "cpu">> & { cpu?: Record<string, unknown> };
 type PartialColonyMemory = Partial<Omit<ColonyMemory, "intel">> & { intel?: Partial<ColonyIntelMemory> };
+type PartialStrategyPlanMemory = Partial<StrategyPlanMemory>;
 
 const orderedMigrations: {[version: number]: MigrationStep} = {
   1: migrateToVersion1,
   2: migrateToVersion2,
-  3: migrateToVersion3
+  3: migrateToVersion3,
+  4: migrateToVersion4
 };
 
 /**
@@ -197,6 +200,84 @@ function migrateToVersion3(memory: Memory): void {
   const defaults = createDefaultProjectMemorySections();
 
   // v3 只扩展 Phase 4 primitive 的 JSON 默认结构；现有 colony/process/creep 数据必须原样保留。
+  memory.version = 3;
+  memory.runtime = {
+    ...defaults.runtime,
+    ...memory.runtime,
+    lastMigration: 3,
+    migrationError: null,
+    environment: {
+      ...defaults.runtime.environment,
+      ...memory.runtime?.environment
+    },
+    sim: {
+      ...defaults.runtime.sim,
+      ...memory.runtime?.sim,
+      bootstrap: {
+        ...defaults.runtime.sim.bootstrap,
+        ...memory.runtime?.sim?.bootstrap
+      },
+      guidance: memory.runtime?.sim?.guidance || defaults.runtime.sim.guidance
+    }
+  };
+  memory.config = {
+    automation: {
+      ...defaults.config.automation,
+      ...memory.config?.automation
+    },
+    strategy: {
+      ...defaults.config.strategy,
+      ...memory.config?.strategy
+    },
+    construction: {
+      ...defaults.config.construction,
+      ...memory.config?.construction
+    },
+    defense: {
+      ...defaults.config.defense,
+      ...memory.config?.defense
+    },
+    colony: {
+      ...defaults.config.colony,
+      ...memory.config?.colony
+    },
+    observability: {
+      ...defaults.config.observability,
+      ...memory.config?.observability,
+      profiler: {
+        ...defaults.config.observability.profiler,
+        ...memory.config?.observability?.profiler
+      },
+      deepProfiler: {
+        ...defaults.config.observability.deepProfiler,
+        ...memory.config?.observability?.deepProfiler
+      }
+    }
+  };
+  memory.stats = {
+    ticks: typeof memory.stats?.ticks === "number" ? memory.stats.ticks : defaults.stats.ticks,
+    cpu: {
+      ...defaults.stats.cpu,
+      ...memory.stats?.cpu,
+      stages: {
+        ...defaults.stats.cpu.stages,
+        ...memory.stats?.cpu?.stages
+      }
+    }
+  };
+  memory.colonies = repairColonies(memory.colonies, memory.config);
+  memory.processes = memory.processes || defaults.processes;
+  memory.commands = {
+    queue: memory.commands?.queue || defaults.commands.queue,
+    history: memory.commands?.history || defaults.commands.history
+  };
+  memory.creeps = memory.creeps || {};
+}
+
+function migrateToVersion4(memory: Memory): void {
+  const defaults = createDefaultProjectMemorySections();
+
+  // v4 只补策略配置门和每个 colony 的解释型摘要；Phase 4 的运行时、队列和进程数据原样保留。
   memory.version = CURRENT_MEMORY_VERSION;
   memory.runtime = {
     ...defaults.runtime,
@@ -321,7 +402,30 @@ function repairColony(
     primary,
     status,
     intel: repairColonyIntel(resolvedRoomName, primary, status, existingColony.intel),
-    spawnQueue: Array.isArray(existingColony.spawnQueue) ? existingColony.spawnQueue : []
+    spawnQueue: Array.isArray(existingColony.spawnQueue) ? existingColony.spawnQueue : [],
+    strategy: repairStrategyPlan(resolvedRoomName, existingColony.strategy as PartialStrategyPlanMemory | undefined)
+  };
+}
+
+export function repairStrategyPlan(
+  roomName: string,
+  existingPlan: PartialStrategyPlanMemory | undefined
+): StrategyPlanMemory {
+  const plan = existingPlan ?? {};
+
+  return {
+    version: typeof plan.version === "number" ? plan.version : 1,
+    roomName: typeof plan.roomName === "string" ? plan.roomName : roomName,
+    stage: typeof plan.stage === "string" ? plan.stage : "unknown",
+    status: plan.status === "fresh" || plan.status === "blocked" || plan.status === "stale" ? plan.status : "stale",
+    lastRunTick: typeof plan.lastRunTick === "number" ? plan.lastRunTick : 0,
+    nextRunTick: typeof plan.nextRunTick === "number" ? plan.nextRunTick : 0,
+    lastTrigger: typeof plan.lastTrigger === "string" ? plan.lastTrigger : "migration",
+    signature: typeof plan.signature === "string" ? plan.signature : "",
+    priorities: Array.isArray(plan.priorities) ? plan.priorities : [],
+    intents: Array.isArray(plan.intents) ? plan.intents : [],
+    deferrals: Array.isArray(plan.deferrals) ? plan.deferrals : [],
+    reasons: Array.isArray(plan.reasons) && plan.reasons.length > 0 ? plan.reasons : ["strategy pending evaluation"]
   };
 }
 
