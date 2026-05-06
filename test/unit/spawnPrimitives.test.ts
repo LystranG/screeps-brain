@@ -141,7 +141,7 @@ describe("spawn primitives dry-run runner", () => {
     assert.include(spawn.calls[0].name, "worker-W1N1-22");
   });
 
-  it("records numeric return code string when dry-run spawnCreep fails", () => {
+  it("records recoverable dry-run failures as waiting without consuming attempts", () => {
     const memory = createMemoryWithDefaults();
     const spawn = createSpawn("Spawn1", false, ERR_NOT_ENOUGH_ENERGY);
     enqueueSpawnRequest(
@@ -161,11 +161,46 @@ describe("spawn primitives dry-run runner", () => {
     const result = runSpawnValidation([createContext("W1N1", true, [spawn])], memory, {} as Game, 23);
 
     assert.isFalse(result.ok);
-    assert.equal(result.status, "error");
+    assert.equal(result.status, "waiting");
     assert.equal(result.reason, "-6");
-    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 1);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 0);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-6");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].lastTriedTick, 23);
     assert.isTrue(spawn.calls[0].options.dryRun);
+  });
+
+  it("records dry-run busy as waiting without pushing the request to failed", () => {
+    const memory = createMemoryWithDefaults();
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: "spawn-worker-dry-run-busy",
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: "dry-run busy",
+        requestedTick: 30
+      })
+    );
+
+    for (let offset = 0; offset < MAX_VALIDATION_ATTEMPTS + 1; offset += 1) {
+      const result = runSpawnValidation(
+        [createContext("W1N1", true, [createSpawn("Spawn1", false, ERR_BUSY)])],
+        memory,
+        {} as Game,
+        31 + offset
+      );
+
+      assert.equal(result.status, "waiting");
+    }
+
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 0);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-4");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].lastTriedTick, 34);
   });
 
   it("validates a later secondary request when the primary candidate has no idle spawn", () => {

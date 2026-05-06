@@ -108,6 +108,20 @@ function runQueuedValidation(
     };
   }
 
+  if (isRecoverableSpawnCode(returnCode)) {
+    markSpawnRequestWaiting(memory, selected.request.roomName, selected.request.id, returnCode, tick);
+
+    return {
+      ok: false,
+      status: "waiting",
+      reason: String(returnCode),
+      roomName: selected.context.roomName,
+      requestId: selected.request.id,
+      spawnName: spawn.name,
+      returnCode
+    };
+  }
+
   const error = String(returnCode);
   markSpawnRequestError(memory, selected.request.roomName, selected.request.id, error, tick);
 

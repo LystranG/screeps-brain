@@ -129,7 +129,7 @@ describe("bootstrap execution slots", () => {
 });
 
 describe("bootstrap execution spawn demand", () => {
-  it("enqueues stable bootstrap spawn requests and counts active duplicates", () => {
+  it("enqueues spawn requests up to target population and counts active duplicates", () => {
     const memory = createMemory();
     const context = createContext({
       spawns: [createSpawn("Spawn1")],
@@ -141,16 +141,45 @@ describe("bootstrap execution spawn demand", () => {
 
     const created = applyBootstrapSpawnDemand(result.slots, memory, context, 260);
 
-    assert.equal(created.created, 5);
+    assert.equal(result.targetPopulation, 3);
+    assert.equal(created.created, 3);
     assert.equal(created.duplicate, 0);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].id, "bootstrap:W1N1:source:source-a:0:worker");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].role, RoleName.worker);
+    assert.deepEqual(
+      memory.colonies.W1N1.spawnQueue.map(request => request.id),
+      [
+        "bootstrap:W1N1:source:source-a:0:worker",
+        "bootstrap:W1N1:source:source-b:0:worker",
+        "bootstrap:W1N1:upgrade:controller-a:0:worker"
+      ]
+    );
 
     const duplicate = applyBootstrapSpawnDemand(result.slots, memory, context, 261);
 
     assert.equal(duplicate.created, 0);
-    assert.equal(duplicate.duplicate, 5);
-    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 5);
+    assert.equal(duplicate.duplicate, 3);
+    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 3);
+  });
+
+  it("does not enqueue more spawn requests than missing target population", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a"), createSource("source-b")],
+      controller: createController("controller-a"),
+      creeps: [createCreep("WorkerA", RoleName.worker, 0), createCreep("WorkerB", RoleName.worker, 50)]
+    });
+    const result = buildBootstrapSlots(context, memory, 261);
+
+    const created = applyBootstrapSpawnDemand(result.slots, memory, context, 261);
+    const summary = runBootstrapExecution([context], createMemory(), 262);
+
+    assert.equal(result.targetPopulation, 3);
+    assert.equal(created.created, 1);
+    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+    assert.equal(summary.spawnRequestsCreated, 1);
+    assert.equal(summary.tasksAssigned, 2);
   });
 
   it("does not re-enqueue queued, validated, or spawning requests for the same slot", () => {
@@ -186,6 +215,78 @@ describe("bootstrap execution spawn demand", () => {
       assert.equal(duplicate.created, 0);
       assert.equal(duplicate.duplicate, 1);
       assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+    }
+  });
+
+  it("deduplicates active requests by stable slot id even when desired role changes", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a"), createSource("source-b")],
+      controller: createController("controller-a"),
+      creeps: [createCreep("WorkerA", RoleName.worker, 0), createCreep("WorkerB", RoleName.worker, 50)]
+    });
+    const result = buildBootstrapSlots(context, memory, 263);
+    const sourceSlot = result.slots.find(slot => slot.id === "source:source-a:0");
+
+    assert.isDefined(sourceSlot);
+    assert.equal(sourceSlot?.spawn?.role, RoleName.harvester);
+    enqueueSpawnRequest(
+      memory,
+      createSpawnRequest({
+        id: `bootstrap:W1N1:${sourceSlot?.id}:worker`,
+        roomName: "W1N1",
+        role: RoleName.worker,
+        priority: 20,
+        body: ["work", "carry", "move"],
+        memory: { role: RoleName.worker } as CreepMemory,
+        reason: "existing active worker request",
+        requestedTick: 262
+      })
+    );
+
+    const duplicate = applyBootstrapSpawnDemand([sourceSlot as BootstrapSlot], memory, context, 263);
+
+    assert.equal(duplicate.created, 0);
+    assert.equal(duplicate.duplicate, 1);
+    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+  });
+
+  it("replaces terminal spawned or failed requests for the same stable slot id", () => {
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a")],
+      controller: createController("controller-a"),
+      creeps: []
+    });
+    const sourceSlot = buildBootstrapSlots(context, createMemory(), 264).slots.find(slot => {
+      return slot.id === "source:source-a:0";
+    });
+
+    assert.isDefined(sourceSlot);
+
+    for (const status of ["spawned", "failed"] as const) {
+      const memory = createMemory();
+      const request = createSpawnRequest({
+        id: `bootstrap:W1N1:${sourceSlot?.id}:harvester`,
+        roomName: "W1N1",
+        role: RoleName.harvester,
+        priority: 20,
+        body: ["work", "carry", "move"],
+        memory: { role: RoleName.harvester } as CreepMemory,
+        reason: "terminal request",
+        requestedTick: 263
+      });
+      request.status = status;
+      enqueueSpawnRequest(memory, request);
+
+      const replacement = applyBootstrapSpawnDemand([sourceSlot as BootstrapSlot], memory, context, 264);
+
+      assert.equal(replacement.created, 1);
+      assert.equal(replacement.duplicate, 0);
+      assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+      assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+      assert.equal(memory.colonies.W1N1.spawnQueue[0].requestedTick, 264);
     }
   });
 });
@@ -265,7 +366,7 @@ describe("bootstrap execution process registration", () => {
     assert.deepEqual(summary, {
       colonies: 1,
       slots: 5,
-      spawnRequestsCreated: 5,
+      spawnRequestsCreated: 1,
       spawnRequestsDuplicate: 0,
       tasksAssigned: 2,
       blocked: 0

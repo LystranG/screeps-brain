@@ -27,19 +27,31 @@ export function applyBootstrapSpawnDemand(
     skipped: 0,
     requestIds: []
   };
+  const missingPopulation = Math.max(0, calculateTargetPopulation(context) - context.stage.creepCount);
+  let spawnDemandAccepted = 0;
 
-  for (const slot of slots) {
+  // 任务槽位仍保留给现有 creep；这里只按优先级限制本 tick 新增的 spawn demand。
+  for (const slot of [...slots].sort((left, right) => left.priority - right.priority)) {
     if (slot.spawn === null) {
       summary.skipped += 1;
       continue;
     }
 
-    const requestId = createBootstrapRequestId(context.roomName, slot.id, slot.spawn.role);
-
-    if (hasActiveRequest(memory, context.roomName, requestId)) {
-      summary.duplicate += 1;
+    if (spawnDemandAccepted >= missingPopulation) {
+      summary.skipped += 1;
       continue;
     }
+
+    const requestId = createBootstrapRequestId(context.roomName, slot.id, slot.spawn.role);
+    const slotRequestPrefix = createBootstrapSlotRequestPrefix(context.roomName, slot.id);
+
+    if (hasActiveSlotRequest(memory, context.roomName, slotRequestPrefix)) {
+      summary.duplicate += 1;
+      spawnDemandAccepted += 1;
+      continue;
+    }
+
+    removeTerminalSlotRequests(memory, context.roomName, slotRequestPrefix);
 
     const result = enqueueSpawnRequest(
       memory,
@@ -59,6 +71,7 @@ export function applyBootstrapSpawnDemand(
 
     if (result.ok) {
       summary.created += 1;
+      spawnDemandAccepted += 1;
       summary.requestIds.push(requestId);
     } else {
       summary.duplicate += 1;
@@ -72,8 +85,32 @@ function createBootstrapRequestId(roomName: string, slotId: string, role: string
   return `bootstrap:${roomName}:${slotId}:${role}`;
 }
 
-function hasActiveRequest(memory: ProjectMemoryShape, roomName: string, requestId: string): boolean {
+function createBootstrapSlotRequestPrefix(roomName: string, slotId: string): string {
+  return `bootstrap:${roomName}:${slotId}:`;
+}
+
+function hasActiveSlotRequest(memory: ProjectMemoryShape, roomName: string, requestIdPrefix: string): boolean {
   const queue = memory.colonies[roomName]?.spawnQueue ?? [];
 
-  return queue.some(request => request.id === requestId && ACTIVE_REQUEST_STATUSES.indexOf(request.status) >= 0);
+  return queue.some(request => request.id.indexOf(requestIdPrefix) === 0 && ACTIVE_REQUEST_STATUSES.indexOf(request.status) >= 0);
+}
+
+function removeTerminalSlotRequests(memory: ProjectMemoryShape, roomName: string, requestIdPrefix: string): void {
+  const colony = memory.colonies[roomName];
+
+  if (!colony) {
+    return;
+  }
+
+  colony.spawnQueue = colony.spawnQueue.filter(request => {
+    return request.id.indexOf(requestIdPrefix) !== 0 || ACTIVE_REQUEST_STATUSES.indexOf(request.status) >= 0;
+  });
+}
+
+function calculateTargetPopulation(context: ColonyContext): number {
+  if (!context.stage.hasSpawn || !context.stage.hasSource || !context.stage.hasController) {
+    return 0;
+  }
+
+  return Math.min(4, Math.max(2, context.stage.sourceCount + 1));
 }
