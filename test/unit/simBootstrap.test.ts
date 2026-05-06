@@ -135,7 +135,7 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     const logger = new Logger({}, () => 20);
 
     game.rooms = {
-      W1N1: { sources: [{}] }
+      W1N1: { controller: {}, sources: [{}] }
     };
     game.spawns = {
       Spawn1: {}
@@ -158,7 +158,7 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     const find = sinon.stub().returns([{}]);
 
     game.rooms = {
-      W1N1: { find }
+      W1N1: { controller: {}, find }
     };
     game.spawns = {
       Spawn1: {}
@@ -195,7 +195,6 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     assert.isTrue(createFlag.calledWith("lystran-sim-source-needed"));
     assert.isTrue(createFlag.calledWith("lystran-sim-spawn-needed"));
     assert.isTrue(createFlag.calledWith("lystran-sim-creep-needed"));
-    assert.isTrue(createFlag.calledWith("lystran-sim-controller-needed"));
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
   });
 
@@ -219,7 +218,7 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
     runSimBootstrap(memory, game as unknown as Game, logger, 45);
     runSimBootstrap(memory, game as unknown as Game, logger, 46);
 
-    assert.equal(createFlag.callCount, 4);
+    assert.equal(createFlag.callCount, 3);
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
   });
 

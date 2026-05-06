@@ -28,6 +28,7 @@ interface SourceDetectionResult {
 interface SourceAwareRoom {
   find?: (type: FIND_SOURCES) => Source[];
   sources?: Source[];
+  controller?: StructureController | null;
 }
 
 interface FlagGuidanceRoom {
@@ -42,12 +43,18 @@ const FIND_SOURCES_CONSTANT = 105 as FIND_SOURCES;
 const ERR_NAME_EXISTS_CODE = -3 as ERR_NAME_EXISTS;
 
 const GuidanceMessage = {
-  missingSource: "Sim setup needs at least one visible source; normal bot runtime cannot create sources.",
-  missingSpawn: "Sim setup needs at least one owned spawn; normal bot runtime cannot create spawn structures.",
-  missingCreep: "Sim setup has no creeps yet; create an initial worker or let a prepared sim seed provide one."
+  missingController:
+    "Sim setup needs a visible controller; runtime code cannot create sources, spawns, or initial creeps.",
+  missingSource:
+    "Sim setup needs at least one visible source; runtime code cannot create sources, spawns, or initial creeps.",
+  missingSpawn:
+    "Sim setup needs at least one owned spawn; runtime code cannot create sources, spawns, or initial creeps.",
+  missingCreep:
+    "Sim setup has no creeps yet; runtime code cannot create sources, spawns, or initial creeps."
 } as const;
 
 const GuidanceFlagName: { [code: string]: string } = {
+  "missing-controller": "lystran-sim-controller-needed",
   "missing-source": "lystran-sim-source-needed",
   "missing-spawn": "lystran-sim-spawn-needed",
   "missing-creep": "lystran-sim-creep-needed"
@@ -64,10 +71,16 @@ export function runSimBootstrap(memory: Memory, game: Game, logger: Logger, tick
   }
 
   const sourceDetection = detectVisibleSources(game.rooms);
-  const guidanceMessages = buildGuidanceMessages(sourceDetection, metadata.spawnCount, Object.keys(game.creeps).length);
+  const hasController = detectVisibleController(game.rooms);
+  const guidanceMessages = buildGuidanceMessages(
+    hasController,
+    sourceDetection,
+    metadata.spawnCount,
+    Object.keys(game.creeps).length
+  );
   const loggedCodes = updateGuidance(memory, logger, guidanceMessages, tick);
   updateFlagGuidance(memory, game, Object.keys(guidanceMessages));
-  const ready = metadata.spawnCount > 0 && sourceDetection.available && sourceDetection.count > 0;
+  const ready = hasController && metadata.spawnCount > 0 && sourceDetection.available && sourceDetection.count > 0;
 
   memory.runtime.sim.bootstrap.version = SIM_BOOTSTRAP_VERSION;
   memory.runtime.sim.bootstrap.completed = true;
@@ -80,6 +93,14 @@ export function runSimBootstrap(memory: Memory, game: Game, logger: Logger, tick
     guidanceCodes: Object.keys(guidanceMessages),
     loggedCodes
   };
+}
+
+function detectVisibleController(rooms: Game["rooms"]): boolean {
+  return Object.keys(rooms).some(roomName => {
+    const room = rooms[roomName] as unknown as SourceAwareRoom;
+
+    return room.controller !== undefined && room.controller !== null;
+  });
 }
 
 function detectVisibleSources(rooms: Game["rooms"]): SourceDetectionResult {
@@ -106,11 +127,16 @@ function detectVisibleSources(rooms: Game["rooms"]): SourceDetectionResult {
 }
 
 function buildGuidanceMessages(
+  hasController: boolean,
   sourceDetection: SourceDetectionResult,
   spawnCount: number,
   creepCount: number
 ): { [code: string]: string } {
   const messages: { [code: string]: string } = {};
+
+  if (!hasController) {
+    messages["missing-controller"] = GuidanceMessage.missingController;
+  }
 
   if (!sourceDetection.available || sourceDetection.count === 0) {
     messages["missing-source"] = GuidanceMessage.missingSource;
