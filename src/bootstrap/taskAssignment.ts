@@ -1,8 +1,8 @@
 import { BootstrapSlot, BootstrapTaskDemand } from "bootstrap/slots";
+import { TaskStatus, TaskType, createTaskMemory } from "tasks/model";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { TaskMemory } from "memory/schema";
-import { createTaskMemory, TaskStatus, TaskType } from "tasks/model";
 
 export interface BootstrapTaskAssignmentSummary {
   assigned: number;

@@ -1,9 +1,9 @@
-import { BootstrapSlot } from "bootstrap/slots";
-import { ColonyContext } from "colony/types";
 import { ProjectMemoryShape, SpawnRequestMemory } from "memory/schema";
 import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
+import { BootstrapSlot } from "bootstrap/slots";
+import { ColonyContext } from "colony/types";
 
-const ACTIVE_REQUEST_STATUSES: ReadonlyArray<SpawnRequestMemory["status"]> = ["queued", "validated", "spawning"];
+const ACTIVE_REQUEST_STATUSES: readonly SpawnRequestMemory["status"][] = ["queued", "validated", "spawning"];
 
 export interface BootstrapSpawnDemandSummary {
   created: number;

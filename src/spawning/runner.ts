@@ -4,8 +4,8 @@ import {
   markSpawnRequestError,
   markSpawnRequestSpawned,
   markSpawnRequestSpawning,
-  markSpawnRequestWaiting,
   markSpawnRequestValidated,
+  markSpawnRequestWaiting,
   selectNextSpawnRequestByStatus
 } from "spawning/queue";
 import { ColonyContext } from "colony/types";

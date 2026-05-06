@@ -1,8 +1,8 @@
-import { ColonyContext } from "colony/types";
-import { RoleName } from "constants/roles";
-import { ProjectMemoryShape } from "memory/schema";
 import { BodyIntent, buildBody } from "spawning/bodyBuilder";
 import { TaskType, TaskTypeName } from "tasks/model";
+import { ColonyContext } from "colony/types";
+import { ProjectMemoryShape } from "memory/schema";
+import { RoleName } from "constants/roles";
 
 export type BootstrapSlotKind = "workerFallback" | "source" | "upgrade";
 export type BootstrapDemandKind = TaskTypeName | "pickup" | "transfer" | "refill";

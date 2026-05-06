@@ -12,8 +12,8 @@ import {
   StrategyPlanMemory,
   createDefaultProjectMemorySections
 } from "memory/schema";
-import { RoleName } from "constants/roles";
 import { StrategyIntentStatus, StrategyIntentType } from "constants/strategy";
+import { RoleName } from "constants/roles";
 
 export type MigrationResult = { ok: true; version: typeof CURRENT_MEMORY_VERSION } | { ok: false; reason: string };
 

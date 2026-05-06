@@ -1,6 +1,6 @@
-import { TaskMemory } from "memory/schema";
-import { RoleRunnerContext, RoleRunResult } from "roles/registry";
+import { RoleRunResult, RoleRunnerContext } from "roles/registry";
 import { TaskStatus, TaskType } from "tasks/model";
+import { TaskMemory } from "memory/schema";
 
 export function runCreepTask(creep: Creep, context: RoleRunnerContext): RoleRunResult {
   const task = creep.memory.task;

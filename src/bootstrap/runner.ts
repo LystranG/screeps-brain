@@ -1,8 +1,8 @@
-import { applyBootstrapSpawnDemand } from "bootstrap/spawnDemand";
-import { buildBootstrapSlots } from "bootstrap/slots";
-import { assignBootstrapTasks } from "bootstrap/taskAssignment";
 import { ColonyContext } from "colony/types";
 import { ProjectMemoryShape } from "memory/schema";
+import { applyBootstrapSpawnDemand } from "bootstrap/spawnDemand";
+import { assignBootstrapTasks } from "bootstrap/taskAssignment";
+import { buildBootstrapSlots } from "bootstrap/slots";
 
 export interface BootstrapExecutionSummary {
   colonies: number;
