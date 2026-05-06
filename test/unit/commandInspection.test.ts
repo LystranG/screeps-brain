@@ -8,6 +8,7 @@ import { createFutureNamespaces } from "commands/namespaces/future";
 import { createColonyNamespace } from "commands/namespaces/colony";
 import { createSimNamespace } from "commands/namespaces/sim";
 import { createSpawnNamespace } from "commands/namespaces/spawn";
+import { createStrategyNamespace } from "commands/namespaces/strategy";
 import { createDefaultCommandRegistry } from "commands/registry";
 import { createDefaultProjectMemorySections, createDefaultStrategyPlanMemory } from "memory/schema";
 import { createMockGame, createMockRoom } from "./mock";
@@ -578,6 +579,180 @@ describe("command inspection|spawn", () => {
     assert.isDefined(registry.getNamespace("spawn"));
     assert.notInclude(futureNames, "spawn");
     assert.include(renderNamespaceHelp(registry.getNamespace("spawn")!), "cmd.spawn.dryRun");
+  });
+});
+
+describe("command inspection|strategy", () => {
+  function createInspectionMemory(): Memory {
+    const memory = {
+      ...createDefaultProjectMemorySections(),
+      creeps: {}
+    } as Memory;
+
+    memory.config.colony.primaryRoomName = "W1N1";
+    memory.config.strategy.allowExpansion = true;
+    memory.colonies.W1N1 = {
+      roomName: "W1N1",
+      primary: true,
+      status: "ready",
+      intel: {
+        roomName: "W1N1",
+        lastSeenTick: 200,
+        lastRefreshTick: 200,
+        status: "ready",
+        missingReasons: [],
+        controllerId: "controller-primary",
+        rcl: 3,
+        sourceIds: ["source-a", "source-b"],
+        spawnIds: ["spawn-primary"],
+        primary: true,
+        stage: "rcl3"
+      },
+      spawnQueue: [],
+      strategy: {
+        version: 1,
+        roomName: "W1N1",
+        stage: "rcl3",
+        status: "fresh",
+        lastRunTick: 210,
+        nextRunTick: 260,
+        lastTrigger: "state-change",
+        signature: "primary-signature",
+        priorities: ["worker coverage", "upgrade", "defense"],
+        intents: [
+          {
+            type: "maintainWorkerCoverage",
+            priority: 100,
+            status: "allowed",
+            reason: "maintain worker coverage",
+            gate: null
+          },
+          {
+            type: "prioritizeUpgrade",
+            priority: 90,
+            status: "allowed",
+            reason: "prioritize controller upgrade",
+            gate: null
+          }
+        ],
+        deferrals: [
+          {
+            type: "deferExpansion",
+            priority: 10,
+            status: "allowed",
+            reason: "deferral: deferExpansion allowed by strategy.allowExpansion",
+            gate: "strategy.allowExpansion"
+          },
+          {
+            type: "deferRemoteMining",
+            priority: 10,
+            status: "gated",
+            reason: "deferral: deferRemoteMining gated by strategy.allowRemoteMining",
+            gate: "strategy.allowRemoteMining"
+          }
+        ],
+        reasons: [
+          "worker coverage: 2 creeps available for 2 sources",
+          "upgrade: controller RCL 3 can progress",
+          "deferral: deferRemoteMining gated by strategy.allowRemoteMining"
+        ]
+      }
+    };
+    memory.colonies.W2N2 = {
+      roomName: "W2N2",
+      primary: false,
+      status: "degraded",
+      intel: {
+        roomName: "W2N2",
+        lastSeenTick: 190,
+        lastRefreshTick: 190,
+        status: "degraded",
+        missingReasons: ["missing spawn"],
+        controllerId: "controller-remote",
+        rcl: 1,
+        sourceIds: ["source-c"],
+        spawnIds: [],
+        primary: false,
+        stage: "rcl1"
+      },
+      spawnQueue: [],
+      strategy: {
+        ...createDefaultStrategyPlanMemory("W2N2", "cadence"),
+        stage: "degraded",
+        status: "blocked",
+        lastRunTick: 180,
+        nextRunTick: 230,
+        priorities: ["worker coverage"],
+        deferrals: [
+          {
+            type: "deferWarfare",
+            priority: 10,
+            status: "gated",
+            reason: "deferral: deferWarfare gated by strategy.allowWarfare",
+            gate: "strategy.allowWarfare"
+          }
+        ],
+        reasons: ["repair: degraded colony missing spawn", "deferral: deferWarfare gated by strategy.allowWarfare"]
+      }
+    };
+
+    return memory;
+  }
+
+  function createContext(memory: Memory): CommandContext {
+    return {
+      game: createMockGame() as unknown as Game,
+      memory
+    };
+  }
+
+  it("defines cmd.strategy.status(), cmd.strategy.plan(room?), and cmd.strategy.explain(room?) as read-only inspection", () => {
+    const memory = createInspectionMemory();
+    const namespace = createStrategyNamespace();
+
+    const help = renderNamespaceHelp(namespace);
+    const status = namespace.commands[0].run([], createContext(memory));
+    const plan = namespace.commands[1].run([], createContext(memory));
+    const explicitPlan = namespace.commands[1].run(["W2N2"], createContext(memory));
+    const explain = namespace.commands[2].run([], createContext(memory));
+    const missingPlan = namespace.commands[1].run(["W9N9"], createContext(memory));
+
+    assert.equal(namespace.name, "strategy");
+    assert.equal(namespace.summary, "Read-only strategy planning inspection commands");
+    assert.equal(namespace.effect, CommandEffect.readOnly);
+    assert.deepEqual(
+      namespace.commands.map((command: { name: string }) => command.name),
+      ["status", "plan", "explain"]
+    );
+    assert.include(help, "cmd.strategy.status()");
+    assert.include(help, "cmd.strategy.plan(room?)");
+    assert.include(help, "cmd.strategy.explain(room?)");
+    assert.include(status.message, "strategy status:");
+    assert.include(status.message, "plans=2");
+    assert.include(status.message, "fresh=1");
+    assert.include(status.message, "stale=0");
+    assert.include(status.message, "blocked=1");
+    assert.include(status.message, "expansion=true");
+    assert.include(status.message, "remoteMining=false");
+    assert.include(status.message, "market=false");
+    assert.include(status.message, "warfare=false");
+    assert.include(status.message, "largeFortification=false");
+    assert.include(plan.message, "strategy plan W1N1:");
+    assert.include(plan.message, "stage=rcl3");
+    assert.include(plan.message, "status=fresh");
+    assert.include(plan.message, "lastRunTick=210");
+    assert.include(plan.message, "nextRunTick=260");
+    assert.include(plan.message, "priorities=worker coverage,upgrade,defense");
+    assert.include(plan.message, "intents=2");
+    assert.include(plan.message, "deferrals=2");
+    assert.include(explicitPlan.message, "strategy plan W2N2:");
+    assert.include(explicitPlan.message, "status=blocked");
+    assert.include(explain.message, "strategy explain W1N1:");
+    assert.include(explain.message, "reasons=worker coverage: 2 creeps available for 2 sources");
+    assert.include(explain.message, "deferrals=deferExpansion:allowed@strategy.allowExpansion");
+    assert.include(explain.message, "deferRemoteMining:gated@strategy.allowRemoteMining");
+    assert.equal(missingPlan.status, "ERR");
+    assert.include(missingPlan.message, "strategy plan not found for room W9N9");
   });
 });
 
