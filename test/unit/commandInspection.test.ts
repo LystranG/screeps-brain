@@ -721,6 +721,28 @@ describe("command inspection|strategy", () => {
     assert.equal(registry.execute(["strategy", "plan"], [], context).status, "OK");
     assert.equal(registry.execute(["strategy", "explain"], [], context).status, "OK");
   });
+
+  it("does not mutate strategy, config, or queue Memory from direct read-only handlers", () => {
+    const memory = createInspectionMemory();
+    const context = createContext(memory);
+    const namespace = createStrategyNamespace();
+    const beforeColonies = JSON.stringify(memory.colonies);
+    const beforeConfig = JSON.stringify(memory.config);
+    const beforeQueue = JSON.stringify(memory.commands.queue);
+
+    const status = namespace.commands[0].run([], context);
+    const plan = namespace.commands[1].run([], context);
+    const explain = namespace.commands[2].run([], context);
+
+    assert.equal(JSON.stringify(memory.colonies), beforeColonies);
+    assert.equal(JSON.stringify(memory.config), beforeConfig);
+    assert.equal(JSON.stringify(memory.commands.queue), beforeQueue);
+    assert.include(explain.message, "reasons=worker coverage: 2 creeps available for 2 sources");
+    assert.include(plan.message, "priorities=worker coverage,upgrade,defense");
+    assert.include(explain.message, "gated=deferRemoteMining:gated@strategy.allowRemoteMining");
+    assert.include(explain.message, "deferral: deferRemoteMining gated by strategy.allowRemoteMining");
+    assert.include(status.message, "gates=expansion=true");
+  });
 });
 
 interface InspectableSpawn extends StructureSpawn {
