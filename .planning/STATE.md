@@ -2,29 +2,29 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 06
-status: ready_to_plan
-last_updated: "2026-05-06T10:02:21Z"
+current_phase: 07
+status: executing
+last_updated: "2026-05-07T07:15:21.827Z"
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 24
-  completed_plans: 24
-  percent: 83
+  total_phases: 7
+  completed_phases: 6
+  total_plans: 34
+  completed_plans: 32
+  percent: 94
 ---
 
 # GSD State: lystran-brain
 
 **Initialized:** 2026-05-03
-**Current Phase:** 6
-**Status:** Ready to plan
+**Current Phase:** 07
+**Status:** Executing Phase 07
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-03)
 
 **Core value:** The system must provide a maintainable, extensible Screeps control architecture where long-term automation can grow safely from a tested, observable, low-coupling foundation.
-**Current focus:** Phase 06 — minimal-rcl1-bootstrap-loop
+**Current focus:** Phase 07 — integration-testing-runtime-fixes-and-chinese-operations-gui
 
 ## Workflow Configuration
 
@@ -55,14 +55,17 @@ See: `.planning/PROJECT.md` (updated 2026-05-03)
 | 3 | Complete | Expose an extensible tree-shaped `global.cmd` interface. |
 | 4 | Complete | Add colony context, room intel, process, role, task, spawn queue, and body builder abstractions. |
 | 5 | Complete | Add explainable semi-automatic long-term planning with policy gates and sim handoff. |
-| 6 | Pending | Use the foundation to maintain workers, harvest energy, and upgrade a controller. |
+| 6 | Complete | Use the foundation to maintain workers, harvest energy, and upgrade a controller. |
+| 7 | Ready to execute | Enable integration testing, fix runtime/test gaps, and document startup workflows in Chinese. |
 
 ## Next Step
 
-Plan Phase 06 or run the next GSD workflow for the minimal RCL1 bootstrap loop.
+Execute Phase 07 with `/gsd-execute-phase 7`.
 
 ## Recent Session
 
+- 2026-05-07T07:13:57Z — Completed 07-04-PLAN.md; SUMMARY written at `.planning/phases/07-integration-testing-runtime-fixes-and-chinese-operations-gui/07-04-SUMMARY.md`.
+- 2026-05-07T00:02:51Z — Phase 06 verified with 21/21 must-haves passing; SUMMARY, REVIEW, and VERIFICATION written under `.planning/phases/06-minimal-rcl1-bootstrap-loop/`.
 - 2026-05-06T09:04:26Z — Completed 05-05-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-05-SUMMARY.md`.
 - 2026-05-06T08:46:57Z — Completed 05-04-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-04-SUMMARY.md`.
 - 2026-05-06T08:24:44Z — Completed 05-03-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-03-SUMMARY.md`.
@@ -96,3 +99,13 @@ Plan Phase 06 or run the next GSD workflow for the minimal RCL1 bootstrap loop.
 - Sim-ready and degraded sim rooms both use the normal Kernel runColoniesAndProcesses strategy path.
 - cmd.strategy reads persisted strategy summaries only and exposes active read-only status, plan, and explain commands.
 - Phase 5 verification gates close with focused tests, full tests, lint, build, non-execution boundary grep, and graphify update passing.
+- Phase 6 bootstrapExecution runs between strategyPlanning and creepRoles, assigns harvest/upgrade task memory, and feeds capped spawn demand into the queue.
+- Kernel runSpawning now consumes real spawn lifecycle states through runSpawnLifecycle while direct spawn calls remain isolated to spawn runner and read-only dryRun inspection.
+- Phase 6 code review blockers CR-01 through CR-03 were resolved before verification; terminal bootstrap requests can be replaced, population demand is capped, and recoverable dry-run spawn waits do not consume attempts.
+- Phase 7 Plan 04 uses `rtk npm run test-integration` as the accepted evidence path; the stale Node 16 plan text is superseded by Node 22 wrapper evidence.
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 7 added: Integration testing, runtime fixes, and Chinese operations guide

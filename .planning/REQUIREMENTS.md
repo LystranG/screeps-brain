@@ -87,6 +87,13 @@
 - [x] **TEST-04**: Unit tests cover logger/profiler behavior without relying on live Screeps.
 - [x] **TEST-05**: Unit tests cover colony context creation, spawn queue priority, and body builder output.
 - [x] **TEST-06**: Build, lint, and unit tests provide the baseline verification gate for implementation phases.
+- [x] **TEST-07**: Integration tests run through `npm run test-integration` against a local Screeps server harness and verify normal owned-room bootstrap behavior.
+- [x] **TEST-08**: Integration tests cover official-sim-style behavior, including ready sim rooms and degraded missing-object guidance paths.
+
+### Operations And Documentation
+
+- [ ] **OPS-01**: The project has a documented startup flow for local integration testing, sim deployment, and normal-room/private-server validation.
+- [ ] **DOC-01**: A Chinese operations guide documents commands, startup sequence, sim setup, normal-room checks, and troubleshooting.
 
 ## v2 Requirements
 
@@ -173,12 +180,16 @@
 | TEST-04 | Phase 2 | Validated |
 | TEST-05 | Phase 4 | Complete |
 | TEST-06 | Phase 1 | Validated |
+| TEST-07 | Phase 7 | Complete |
+| TEST-08 | Phase 7 | Complete |
+| OPS-01 | Phase 7 | Planned |
+| DOC-01 | Phase 7 | Planned |
 
 **Coverage:**
-- v1 requirements: 50 total
-- Mapped to phases: 50
+- v1 requirements: 54 total
+- Mapped to phases: 54
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-03*
-*Last updated: 2026-05-07 after Phase 6 verification*
+*Last updated: 2026-05-07 after Phase 7 addition*

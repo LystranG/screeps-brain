@@ -15,7 +15,8 @@ This roadmap builds lystran-brain from the existing Screeps TypeScript starter i
 | 3 | Console Command System | Complete 2026-05-05 — safe manual control and inspection through a scalable console command tree verified. | CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06, TEST-03 |
 | 4 | Colony and Behavior Primitives | Complete 2026-05-05 — colony context, room intel, process, role, task, spawn queue, body builder, read-only commands, and kernel wiring verified. | COL-01, COL-02, COL-03, COL-04, BEH-01, BEH-02, BEH-03, BEH-04, BEH-05, TEST-05 |
 | 5 | Strategy and Policy Planning | Complete 2026-05-06 — strategy planning, policy gates, read-only inspection, sim handoff, and full verification gates passed. | STR-01, STR-02, STR-03, STR-04, SIM-04 |
-| 6 | Minimal RCL1 Bootstrap Loop | Use the foundation to maintain workers, harvest energy, and upgrade a controller in sim or a normal room. | BOOT-01, BOOT-02, BOOT-03, BOOT-04 |
+| 6 | Minimal RCL1 Bootstrap Loop | Complete 2026-05-07 — minimal worker maintenance, harvest, upgrade, sim guidance, and full verification gates passed. | BOOT-01, BOOT-02, BOOT-03, BOOT-04 |
+| 7 | Integration Testing, Runtime Fixes, and Chinese Operations Guide | Enable and repair Screeps integration testing, verify sim and normal-room runtime behavior, fix discovered gaps, and document command/startup workflows in Chinese. | TEST-07, TEST-08, OPS-01, DOC-01 |
 
 ## Phase Details
 
@@ -153,9 +154,19 @@ Plans:
 
 ## Phase 6: Minimal RCL1 Bootstrap Loop
 
+**Status:** Complete — verified 2026-05-07 with 21/21 must-haves passing.
+
 **Goal:** Prove the architecture by running a minimal single-room loop that maintains workers, harvests energy, and upgrades a controller.
 
 **Requirements:** BOOT-01, BOOT-02, BOOT-03, BOOT-04
+
+**Plans:** 4 plans
+
+Plans:
+- [x] 06-01-PLAN.md — Add bootstrap slots, spawn demand, task assignment, and process registration.
+- [x] 06-02-PLAN.md — Implement real spawn queue lifecycle consumption and read-only lifecycle status.
+- [x] 06-03-PLAN.md — Execute harvest, upgrade, and minimal logistics tasks through role runners.
+- [x] 06-04-PLAN.md — Wire kernel, sim guidance, command inspection, and full bootstrap verification.
 
 **Success Criteria:**
 1. The system discovers a single owned room with controller, spawn, and source data.
@@ -168,6 +179,37 @@ Plans:
 - This phase validates architecture, not final gameplay intelligence.
 - Keep behavior minimal: do not add advanced construction, defense, remote mining, or expansion here.
 - If official sim lacks required world objects, use the sim guidance from Phase 2 or a test harness.
+
+## Phase 7: Integration Testing, Runtime Fixes, and Chinese Operations Guide
+
+**Goal:** Enable the existing Screeps integration-test harness, use it to verify both official-sim-style and normal owned-room bootstrap behavior, fix runtime or test gaps discovered by those scenarios, and publish a Chinese operations guide covering commands and startup flow.
+
+**Requirements:** TEST-07, TEST-08, OPS-01, DOC-01
+
+**Depends on:** Phase 6
+
+**Plans:** 6 plans
+
+Plans:
+- [x] 07-01-PLAN.md — Enable build-first integration test script, install mock-server dependency, and create scenario/assertion helpers.
+- [x] 07-02-PLAN.md — Add normal owned-room integration milestones and bounded bootstrap progression coverage.
+- [x] 07-03-PLAN.md — Add sim-ready shared-path and degraded missing-object integration matrix coverage.
+- [x] 07-04-PLAN.md — Capture full integration evidence, classify failures, and fix only harness/assertion gaps.
+- [ ] 07-05-PLAN.md — Close evidence-backed runtime gaps within a bounded hardening target set.
+- [ ] 07-06-PLAN.md — Publish the Simplified Chinese operations runbook and update docs navigation/testing guidance.
+
+**Success Criteria:**
+1. `npm run test-integration` runs real integration tests instead of printing setup guidance, with required dependencies and scripts documented.
+2. Integration tests cover a normal owned room with controller, spawn, source, worker spawning, harvest/upgrade progression, and relevant `global.cmd` inspection.
+3. Integration tests cover `Game.shard.name === "sim"` behavior, including both ready sim rooms and degraded/missing-object guidance paths where runtime code cannot create world objects.
+4. Any bugs or type/lint issues exposed by integration testing are fixed without weakening the kernel, spawn queue, sim bootstrap, or policy-gate boundaries.
+5. A Chinese document under `docs/` explains test commands, deploy commands, sim setup, normal-room startup, expected console commands, and troubleshooting flow.
+6. `npm run build`, `npm run lint`, `npm test`, and `npm run test-integration` pass, or any remaining external-environment limitation is explicitly documented with a reproducible workaround.
+
+**Implementation Notes:**
+- Reuse `docs/in-depth/testing.md`, `test/integration/helper.ts`, and `test/integration/integration.test.ts` as the starting point, but bring helper code in line with current TypeScript/lint conventions.
+- Prefer `screeps-server-mockup` for deterministic local integration coverage; only document manual MMO/private-server checks where local automation cannot represent the environment.
+- Do not read `screeps.json` from runtime code; deployment instructions should reference `screeps.sample.json` and keep credentials local.
 
 ## Coverage
 
@@ -213,22 +255,26 @@ Plans:
 | STR-02 | Phase 5 | Complete |
 | STR-03 | Phase 5 | Complete |
 | STR-04 | Phase 5 | Complete |
-| BOOT-01 | Phase 6 | Pending |
-| BOOT-02 | Phase 6 | Pending |
-| BOOT-03 | Phase 6 | Pending |
-| BOOT-04 | Phase 6 | Pending |
+| BOOT-01 | Phase 6 | Validated |
+| BOOT-02 | Phase 6 | Validated |
+| BOOT-03 | Phase 6 | Validated |
+| BOOT-04 | Phase 6 | Validated |
 | TEST-01 | Phase 1 | Validated |
 | TEST-02 | Phase 2 | Validated |
 | TEST-03 | Phase 3 | Complete |
 | TEST-04 | Phase 2 | Validated |
 | TEST-05 | Phase 4 | Complete |
 | TEST-06 | Phase 1 | Validated |
+| TEST-07 | Phase 7 | Complete |
+| TEST-08 | Phase 7 | Complete |
+| OPS-01 | Phase 7 | Planned |
+| DOC-01 | Phase 7 | Planned |
 
 **Coverage:**
-- v1 requirements: 50 total
-- Mapped to phases: 50
+- v1 requirements: 54 total
+- Mapped to phases: 54
 - Unmapped: 0
 
 ---
 *Roadmap created: 2026-05-03*
-*Last updated: 2026-05-06 after Phase 5 verification*
+*Last updated: 2026-05-07 after Phase 7 addition*
