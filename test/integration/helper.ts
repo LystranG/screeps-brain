@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { ProjectMemoryShape } from "memory/schema";
 
 const { ScreepsServer, stdHooks } = require("screeps-server-mockup");
 
@@ -37,6 +38,7 @@ interface ServerOptions {
 
 const DEFAULT_ROOM_NAME = "W0N1";
 const RECENT_DIAGNOSTIC_LIMIT = 40;
+const TICK_TIMEOUT_MS = 10000;
 let stdHooksInstalled = false;
 
 export class IntegrationTestHelper {
@@ -97,7 +99,7 @@ export class IntegrationTestHelper {
 
   public async tick(count = 1): Promise<void> {
     for (let index = 0; index < count; index += 1) {
-      await this._server.tick();
+      await this.withTimeout(this._server.tick(), TICK_TIMEOUT_MS, "server.tick()");
     }
   }
 
@@ -113,10 +115,10 @@ export class IntegrationTestHelper {
     throw new Error(`Timed out waiting for ${label}: ${JSON.stringify(await this.diagnostics(label))}`);
   }
 
-  public async readMemory(): Promise<Memory> {
+  public async readMemory(): Promise<ProjectMemoryShape> {
     const memory = await this._player.memory;
 
-    return JSON.parse(memory) as Memory;
+    return JSON.parse(memory) as ProjectMemoryShape;
   }
 
   public async runCommand(command: string): Promise<string> {
@@ -290,6 +292,23 @@ export class IntegrationTestHelper {
     }
 
     return this._server.world.gameTime;
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timeout: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<T>((_resolve, reject) => {
+      timeout = setTimeout(async () => {
+        reject(new Error(`${label} timed out after ${timeoutMs}ms: ${JSON.stringify(await this.diagnostics(label))}`));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+    }
   }
 }
 
