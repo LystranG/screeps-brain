@@ -22,8 +22,8 @@ describe("normal owned-room bootstrap", function () {
       const memory = await scenario.readMemory();
 
       assertReadyBootstrapMemory(memory, "W1N1");
-      assert.equal(memory.runtime.environment.type, "red-phase-placeholder");
-      assert.isString(memory.version);
+      assert.oneOf(memory.runtime.environment.type, ["world", "private", "unknown"]);
+      assert.isNumber(memory.version);
       assert.isString(memory.colonies.W1N1.intel.controllerId);
       assert.isAtLeast(memory.colonies.W1N1.intel.sourceIds.length, 1);
       assert.isAtLeast(memory.colonies.W1N1.intel.spawnIds.length, 1);
@@ -34,7 +34,7 @@ describe("normal owned-room bootstrap", function () {
 
       assertCommandIncludes(await scenario.runCommand("cmd.env.status()"), ["type=", "ownedRooms=1"]);
       assertCommandIncludes(await scenario.runCommand("cmd.colony.status()"), ["ready", "W1N1"]);
-      assertCommandIncludes(await scenario.runCommand("cmd.spawn.queue()"), ["queued="]);
+      assert.match(await scenario.runCommand("cmd.spawn.queue()"), /status=(queued|validated|spawning)/);
       assertCommandIncludes(await scenario.runCommand("cmd.strategy.status()"), ["strategy"]);
       assertCommandIncludes(await scenario.runCommand("cmd.debug.stats()"), ["ticks="]);
     } finally {
