@@ -1,5 +1,10 @@
 import { assert } from "chai";
-import { assertCommandIncludes, assertDegradedColonyMemory, assertReadyBootstrapMemory, assertSimGuidanceCodes } from "./assertions";
+import {
+  assertCommandIncludes,
+  assertDegradedColonyMemory,
+  assertReadyBootstrapMemory,
+  assertSimGuidanceCodes
+} from "./assertions";
 import { IntegrationTestHelper } from "./helper";
 import {
   SimDegradedKind,
@@ -28,11 +33,15 @@ describe("official-sim-style bootstrap", function () {
       helper = await createSimReadyScenario({ roomName: "W1N1" });
       const activeHelper = helper;
 
-      await activeHelper.tickUntil(async () => {
-        const memory = await activeHelper.readMemory();
+      await activeHelper.tickUntil(
+        async () => {
+          const memory = await activeHelper.readMemory();
 
-        return memory.runtime?.sim?.bootstrap.completed === true && memory.colonies?.W1N1?.status === "ready";
-      }, 10, "sim ready shared runtime path");
+          return memory.runtime?.sim?.bootstrap.completed === true && memory.colonies?.W1N1?.status === "ready";
+        },
+        10,
+        "sim ready shared runtime path"
+      );
 
       const memory = await activeHelper.readMemory();
       const simStatus = await activeHelper.runCommand("cmd.sim.status()");
@@ -59,7 +68,11 @@ describe("official-sim-style bootstrap", function () {
 
     assert.equal(capability.kind, "manual-fallback-required");
     assert.isString(capability.reason);
-    await activeHelper.tickUntil(async () => (await activeHelper.readMemory()).colonies?.W1N1?.status === "ready", 10, "fallback ready path");
+    await activeHelper.tickUntil(
+      async () => (await activeHelper.readMemory()).colonies?.W1N1?.status === "ready",
+      10,
+      "fallback ready path"
+    );
 
     const memory = await activeHelper.readMemory();
     const colonyStatus = await activeHelper.runCommand("cmd.colony.status()");
@@ -86,11 +99,15 @@ describe("official-sim-style bootstrap", function () {
         helper = await createSimDegradedScenario({ roomName: "W1N1", degradedKind: degradedCase.kind });
         const activeHelper = helper;
 
-        await activeHelper.tickUntil(async () => {
-          const memory = await activeHelper.readMemory();
+        await activeHelper.tickUntil(
+          async () => {
+            const memory = await activeHelper.readMemory();
 
-          return memory.runtime?.sim?.bootstrap.completed === true;
-        }, 10, `sim degraded ${degradedCase.kind}`);
+            return memory.runtime?.sim?.bootstrap.completed === true;
+          },
+          10,
+          `sim degraded ${degradedCase.kind}`
+        );
 
         const memory = await activeHelper.readMemory();
         const simGuidance = await activeHelper.runCommand("cmd.sim.guidance()");
@@ -118,7 +135,11 @@ describe("official-sim-style bootstrap", function () {
 
       assert.equal(capability.kind, "manual-fallback-required");
       assert.isString(capability.reason);
-      await activeHelper.tickUntil(async () => (await activeHelper.readMemory()).runtime !== undefined, 10, `fallback ${degradedCase.kind}`);
+      await activeHelper.tickUntil(
+        async () => (await activeHelper.readMemory()).runtime !== undefined,
+        10,
+        `fallback ${degradedCase.kind}`
+      );
 
       const memory = await activeHelper.readMemory();
       const colonyStatus = await activeHelper.runCommand("cmd.colony.status()");
@@ -143,5 +164,9 @@ function assertSpawnQueueHasProgressed(memory: SpawnQueueMemoryShape, roomName: 
   const statuses = memory.colonies[roomName].spawnQueue.map(request => request.status);
 
   assert.isAtLeast(statuses.length, 1);
-  assert.isTrue(statuses.some(status => ["queued", "validating", "validated", "blocked", "spawning", "spawned", "failed"].indexOf(status) >= 0));
+  assert.isTrue(
+    statuses.some(
+      status => ["queued", "validating", "validated", "blocked", "spawning", "spawned", "failed"].indexOf(status) >= 0
+    )
+  );
 }
