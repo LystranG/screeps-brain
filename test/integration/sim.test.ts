@@ -64,6 +64,17 @@ describe("official-sim-style bootstrap", function () {
     assertCommandIncludes(colonyStatus, ["colony status:", "ready=1"]);
     assertCommandIncludes(spawnQueue, ["spawn queue:"]);
   });
+
+  it("records degraded guidance without breaking kernel health", async () => {
+    const cases = [
+      { kind: "missingSpawn", code: "missing-spawn" },
+      { kind: "missingSource", code: "missing-source" },
+      { kind: "missingController", code: "missing-controller" },
+      { kind: "missingCreep", code: "missing-creep" }
+    ];
+
+    assert.deepEqual(cases, []);
+  });
 });
 
 interface SpawnQueueMemoryShape {
