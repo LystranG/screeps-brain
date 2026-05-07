@@ -1,7 +1,5 @@
 import { readFileSync } from "fs";
-import { join, relative } from "path";
 import { ProjectMemoryShape } from "memory/schema";
-import ts = require("typescript");
 
 const { ScreepsServer, stdHooks } = require("screeps-server-mockup");
 
@@ -245,41 +243,8 @@ export class IntegrationTestHelper {
 
   private loadModules(): { main: string } {
     return {
-      ...this.loadSourceModules(),
       main: readFileSync(DIST_MAIN_JS).toString()
     };
-  }
-
-  private loadSourceModules(): { [moduleName: string]: string } {
-    const configPath = ts.findConfigFile(".", ts.sys.fileExists, "tsconfig.json");
-
-    if (configPath === undefined) {
-      throw new Error("tsconfig.json not found for integration module loading");
-    }
-
-    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, ".");
-    const modules: { [moduleName: string]: string } = {};
-
-    parsed.fileNames
-      .filter(fileName => fileName.indexOf(`${join("src", "")}`) === 0 && fileName.endsWith(".ts") && !fileName.endsWith(".d.ts"))
-      .forEach(fileName => {
-        const source = readFileSync(fileName).toString();
-        const output = ts.transpileModule(source, {
-          compilerOptions: {
-            module: ts.ModuleKind.CommonJS,
-            target: ts.ScriptTarget.ES2018,
-            esModuleInterop: true,
-            experimentalDecorators: true
-          },
-          fileName
-        });
-        const moduleName = relative("src", fileName).replace(/\\/g, "/").replace(/\.ts$/, "");
-
-        modules[moduleName] = output.outputText;
-      });
-
-    return modules;
   }
 
   private captureServerEvents(): void {
