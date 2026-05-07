@@ -63,3 +63,10 @@ Warning/gap:
 ## Runtime Gap Handoff
 
 None. The full integration suite passed through the accepted Node 22 wrapper, and no source subsystem failure was observed.
+
+## Plan 05 Closure
+
+- Closed by: Plan 07-05
+- Result: no runtime hardening applied because this evidence file contains no concrete `runtime hardening gap`.
+- Runtime source edits: none.
+- Boundary: Plan 07-05 proceeds with verification and boundary gates only.
