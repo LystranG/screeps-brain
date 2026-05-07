@@ -182,8 +182,8 @@
 | TEST-06 | Phase 1 | Validated |
 | TEST-07 | Phase 7 | Complete |
 | TEST-08 | Phase 7 | Complete |
-| OPS-01 | Phase 7 | Planned |
-| DOC-01 | Phase 7 | Planned |
+| OPS-01 | Phase 7 | Complete |
+| DOC-01 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 54 total
@@ -192,4 +192,4 @@
 
 ---
 *Requirements defined: 2026-05-03*
-*Last updated: 2026-05-07 after Phase 7 addition*
+*Last updated: 2026-05-07 after Phase 7 verification*
