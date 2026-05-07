@@ -196,7 +196,7 @@ Plans:
 - [x] 07-03-PLAN.md — Add sim-ready shared-path and degraded missing-object integration matrix coverage.
 - [x] 07-04-PLAN.md — Capture full integration evidence, classify failures, and fix only harness/assertion gaps.
 - [x] 07-05-PLAN.md — Close evidence-backed runtime gaps within a bounded hardening target set.
-- [ ] 07-06-PLAN.md — Publish the Simplified Chinese operations runbook and update docs navigation/testing guidance.
+- [x] 07-06-PLAN.md — Publish the Simplified Chinese operations runbook and update docs navigation/testing guidance.
 
 **Success Criteria:**
 1. `npm run test-integration` runs real integration tests instead of printing setup guidance, with required dependencies and scripts documented.

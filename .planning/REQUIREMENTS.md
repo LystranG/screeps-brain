@@ -92,8 +92,8 @@
 
 ### Operations And Documentation
 
-- [ ] **OPS-01**: The project has a documented startup flow for local integration testing, sim deployment, and normal-room/private-server validation.
-- [ ] **DOC-01**: A Chinese operations guide documents commands, startup sequence, sim setup, normal-room checks, and troubleshooting.
+- [x] **OPS-01**: The project has a documented startup flow for local integration testing, sim deployment, and normal-room/private-server validation.
+- [x] **DOC-01**: A Chinese operations guide documents commands, startup sequence, sim setup, normal-room checks, and troubleshooting.
 
 ## v2 Requirements
 
