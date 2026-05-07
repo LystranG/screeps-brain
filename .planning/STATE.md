@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 07
 status: executing
-last_updated: "2026-05-07T07:15:21.827Z"
+last_updated: "2026-05-07T07:27:19.775Z"
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 34
-  completed_plans: 32
-  percent: 94
+  completed_plans: 33
+  percent: 97
 ---
 
 # GSD State: lystran-brain
@@ -64,6 +64,7 @@ Execute Phase 07 with `/gsd-execute-phase 7`.
 
 ## Recent Session
 
+- 2026-05-07T07:25:54Z — Completed 07-05-PLAN.md; SUMMARY written at `.planning/phases/07-integration-testing-runtime-fixes-and-chinese-operations-gui/07-05-SUMMARY.md`.
 - 2026-05-07T07:13:57Z — Completed 07-04-PLAN.md; SUMMARY written at `.planning/phases/07-integration-testing-runtime-fixes-and-chinese-operations-gui/07-04-SUMMARY.md`.
 - 2026-05-07T00:02:51Z — Phase 06 verified with 21/21 must-haves passing; SUMMARY, REVIEW, and VERIFICATION written under `.planning/phases/06-minimal-rcl1-bootstrap-loop/`.
 - 2026-05-06T09:04:26Z — Completed 05-05-PLAN.md; SUMMARY written at `.planning/phases/05-strategy-and-policy-planning/05-05-SUMMARY.md`.
@@ -103,6 +104,7 @@ Execute Phase 07 with `/gsd-execute-phase 7`.
 - Kernel runSpawning now consumes real spawn lifecycle states through runSpawnLifecycle while direct spawn calls remain isolated to spawn runner and read-only dryRun inspection.
 - Phase 6 code review blockers CR-01 through CR-03 were resolved before verification; terminal bootstrap requests can be replaced, population demand is capped, and recoverable dry-run spawn waits do not consume attempts.
 - Phase 7 Plan 04 uses `rtk npm run test-integration` as the accepted evidence path; the stale Node 16 plan text is superseded by Node 22 wrapper evidence.
+- Phase 7 Plan 05 applied no runtime source hardening because Plan 04 evidence recorded `Runtime Gap Handoff: None`; verification used the accepted Node 22 integration wrapper and boundary no-match gates.
 
 ## Accumulated Context
 

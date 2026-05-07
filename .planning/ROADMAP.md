@@ -195,7 +195,7 @@ Plans:
 - [x] 07-02-PLAN.md — Add normal owned-room integration milestones and bounded bootstrap progression coverage.
 - [x] 07-03-PLAN.md — Add sim-ready shared-path and degraded missing-object integration matrix coverage.
 - [x] 07-04-PLAN.md — Capture full integration evidence, classify failures, and fix only harness/assertion gaps.
-- [ ] 07-05-PLAN.md — Close evidence-backed runtime gaps within a bounded hardening target set.
+- [x] 07-05-PLAN.md — Close evidence-backed runtime gaps within a bounded hardening target set.
 - [ ] 07-06-PLAN.md — Publish the Simplified Chinese operations runbook and update docs navigation/testing guidance.
 
 **Success Criteria:**
