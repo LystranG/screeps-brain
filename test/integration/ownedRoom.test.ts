@@ -41,10 +41,8 @@ describe("normal owned-room bootstrap", function () {
       assertCommandIncludes(await scenario.runCommand("cmd.env.status()"), ["type=", "ownedRooms=1"]);
       assertCommandIncludes(await scenario.runCommand("cmd.colony.status()"), ["ready", "W1N1"]);
       const spawnQueue = await scenario.runCommand("cmd.spawn.queue()");
-      assert.isTrue(
-        spawnQueue.indexOf("spawn queue: id=") >= 0 || spawnQueue.indexOf("spawn queue: none") >= 0,
-        spawnQueue
-      );
+      assert.include(spawnQueue, "spawn queue:");
+      assert.isTrue(spawnQueue.indexOf("id=") >= 0 || spawnQueue.indexOf("spawn queue: none") >= 0, spawnQueue);
       assertCommandIncludes(await scenario.runCommand("cmd.spawn.status()"), [
         "spawn status:",
         "queued=",

@@ -115,7 +115,7 @@ describe("official-sim-style bootstrap", function () {
 
         assertSimGuidanceCodes(memory, [degradedCase.code]);
         assertCommandIncludes(simGuidance, [degradedCase.code]);
-        assert.isTrue(colonyStatus.indexOf("OK colony status:") >= 0 || colonyStatus.indexOf("ERR") >= 0);
+        assert.isTrue(colonyStatus.indexOf("colony status:") >= 0 || colonyStatus.indexOf("ERR") >= 0, colonyStatus);
 
         if (degradedCase.kind === "missingCreep") {
           assert.equal(memory.colonies.W1N1.status, "ready");

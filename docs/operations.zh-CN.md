@@ -20,7 +20,7 @@ npm test
 npm run test-integration
 ```
 
-当前集成测试入口是 `npm run test-integration`。该脚本会进入 Node 22 包装路径，先执行原生依赖/运行时 snapshot bootstrap，然后执行等价的 `npm run build && mocha test/integration/**/*.ts`，所以它会先构建 `dist/main.js` 再运行 Mocha 集成套件，避免测试旧 bundle。
+当前集成测试入口是 `npm run test-integration`。项目通过 `mise.toml` 自动使用 Node 22；该脚本会先执行原生依赖/运行时 snapshot bootstrap，然后执行 `npm run build && mocha test/integration/**/*.ts`，所以它会先构建 `dist/main.js` 再运行 Mocha 集成套件，避免测试旧 bundle。
 
 正常信号：
 
@@ -47,7 +47,6 @@ npm run test-integration
 
 ```text
 npm run test-integration
-  -> mise x node@22 -- npm run test-integration:node22 --
   -> npm run test-integration:bootstrap
   -> npm run build && mocha test/integration/**/*.ts
 ```

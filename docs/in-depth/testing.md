@@ -15,9 +15,9 @@ not need the complete Screeps server run-time as integration tests do.
 the normal fast feedback loop.
 
 Use `npm run test-integration` when you need built-bundle evidence against the
-local Screeps harness. This script enters the current Node 22 integration
-wrapper, bootstraps native mock-server runtime pieces, builds the bundle, and
-then runs the integration Mocha suite. The effective integration command is:
+local Screeps harness. The project uses Node 22 through `mise.toml`; this script
+bootstraps native mock-server runtime pieces, builds the bundle, and then runs
+the integration Mocha suite. The effective integration command is:
 
 ```bash
 npm run build && mocha test/integration/**/*.ts
@@ -45,7 +45,6 @@ setup is required; `package.json` already provides:
 
 ```text
 npm run test-integration
-  -> mise x node@22 -- npm run test-integration:node22 --
   -> npm run test-integration:bootstrap
   -> npm run build && mocha test/integration/**/*.ts
 ```
