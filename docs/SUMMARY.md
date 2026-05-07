@@ -7,6 +7,7 @@
 - [Installation](getting-started/installation.md)
 - [Authenticating with Screeps](getting-started/authenticating.md)
 - [Deploying](getting-started/deploying.md)
+- [Chinese Operations Guide](operations.zh-CN.md)
 
 ## In-Depth
 
