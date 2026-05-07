@@ -74,10 +74,10 @@
 
 ### Minimal Bootstrap Loop
 
-- [ ] **BOOT-01**: After the foundation exists, the system can discover a single owned room with controller, spawn, and source data.
-- [ ] **BOOT-02**: The system can maintain a minimal worker population through the spawn queue.
-- [ ] **BOOT-03**: Worker behavior can harvest energy and upgrade the controller through the role/task framework.
-- [ ] **BOOT-04**: The minimal loop can run in sim or a normal room when required objects exist.
+- [x] **BOOT-01**: After the foundation exists, the system can discover a single owned room with controller, spawn, and source data.
+- [x] **BOOT-02**: The system can maintain a minimal worker population through the spawn queue.
+- [x] **BOOT-03**: Worker behavior can harvest energy and upgrade the controller through the role/task framework.
+- [x] **BOOT-04**: The minimal loop can run in sim or a normal room when required objects exist.
 
 ### Testing And Verification
 
@@ -163,10 +163,10 @@
 | STR-02 | Phase 5 | Complete |
 | STR-03 | Phase 5 | Complete |
 | STR-04 | Phase 5 | Complete |
-| BOOT-01 | Phase 6 | Pending |
-| BOOT-02 | Phase 6 | Pending |
-| BOOT-03 | Phase 6 | Pending |
-| BOOT-04 | Phase 6 | Pending |
+| BOOT-01 | Phase 6 | Validated |
+| BOOT-02 | Phase 6 | Validated |
+| BOOT-03 | Phase 6 | Validated |
+| BOOT-04 | Phase 6 | Validated |
 | TEST-01 | Phase 1 | Validated |
 | TEST-02 | Phase 2 | Validated |
 | TEST-03 | Phase 3 | Complete |
@@ -181,4 +181,4 @@
 
 ---
 *Requirements defined: 2026-05-03*
-*Last updated: 2026-05-05 after Phase 2 verification*
+*Last updated: 2026-05-07 after Phase 6 verification*
