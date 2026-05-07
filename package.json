@@ -13,7 +13,9 @@
     "push-sim": "rollup -c --environment DEST:sim",
     "test": "npm run test-unit",
     "test-unit": "mocha test/unit/**/*.ts",
-    "test-integration": "npm run build && mocha test/integration/**/*.ts",
+    "test-integration": "mise x node@22 -- npm run test-integration:node22 --",
+    "test-integration:bootstrap": "npm rebuild @screeps/driver && (cd node_modules/@screeps/driver/node_modules/isolated-vm && npm rebuild) && node --no-node-snapshot node_modules/@screeps/driver/make-runtime-snapshot.js",
+    "test-integration:node22": "npm run test-integration:bootstrap && npm run build && mocha test/integration/**/*.ts",
     "watch-main": "rollup -cw --environment DEST:main",
     "watch-pserver": "rollup -cw --environment DEST:pserver",
     "watch-season": "rollup -cw --environment DEST:season",
@@ -65,6 +67,6 @@
     "source-map": "~0.6.1"
   },
   "overrides": {
-    "isolated-vm": "6.1.2"
+    "isolated-vm": "5.0.4"
   }
 }

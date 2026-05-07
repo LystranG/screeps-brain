@@ -18,15 +18,17 @@ describe("integration harness smoke", function () {
 
   it("ticks the built bundle and exposes project Memory plus global cmd output", async function () {
     helper = await createOwnedRoomScenario();
+    const activeHelper = helper;
 
-    const initialTick = await helper.server.world.gameTime;
-    await helper.tick();
-    const nextTick = await helper.server.world.gameTime;
-    const memory = await helper.readMemory();
-    const help = await helper.runCommand("cmd.help()");
+    const initialTick = await activeHelper.server.world.gameTime;
+    await activeHelper.tick();
+    const nextTick = await activeHelper.server.world.gameTime;
+    const help = await activeHelper.runCommand("cmd.help()");
+    await activeHelper.tickUntil(async () => (await activeHelper.readMemory()).runtime !== undefined, 5, "project Memory migration");
+    const memory = await activeHelper.readMemory();
 
     assert.isAbove(nextTick, initialTick);
-    assertReadyBootstrapMemory(memory, helper.roomName);
+    assertReadyBootstrapMemory(memory, activeHelper.roomName);
     assertProcessRan(memory, ProcessName.colonyIntel);
     assertCommandIncludes(help, [
       "cmd.env.help()",

@@ -1,5 +1,7 @@
 import { readFileSync } from "fs";
+import { join, relative } from "path";
 import { ProjectMemoryShape } from "memory/schema";
+import ts = require("typescript");
 
 const { ScreepsServer, stdHooks } = require("screeps-server-mockup");
 
@@ -100,6 +102,7 @@ export class IntegrationTestHelper {
   public async tick(count = 1): Promise<void> {
     for (let index = 0; index < count; index += 1) {
       await this.withTimeout(this._server.tick(), TICK_TIMEOUT_MS, "server.tick()");
+      await this.runPlayerRuntime();
     }
   }
 
@@ -208,19 +211,14 @@ export class IntegrationTestHelper {
   }
 
   public async addBaseRoom(roomName: string, includeController: boolean, includeSource: boolean): Promise<void> {
-    await this._server.world.addRoom(roomName);
-    await this._server.world.setTerrain(roomName);
+    await this._server.world.stubWorld();
 
-    if (includeController) {
-      await this._server.world.addRoomObject(roomName, "controller", 10, 10, { level: 0 });
+    if (!includeController) {
+      await this.removeRoomObjects(roomName, "controller");
     }
 
-    if (includeSource) {
-      await this._server.world.addRoomObject(roomName, "source", 10, 40, {
-        energy: 1000,
-        energyCapacity: 1000,
-        ticksToRegeneration: 300
-      });
+    if (!includeSource) {
+      await this.removeRoomObjects(roomName, "source");
     }
   }
 
@@ -240,8 +238,41 @@ export class IntegrationTestHelper {
 
   private loadModules(): { main: string } {
     return {
+      ...this.loadSourceModules(),
       main: readFileSync(DIST_MAIN_JS).toString()
     };
+  }
+
+  private loadSourceModules(): { [moduleName: string]: string } {
+    const configPath = ts.findConfigFile(".", ts.sys.fileExists, "tsconfig.json");
+
+    if (configPath === undefined) {
+      throw new Error("tsconfig.json not found for integration module loading");
+    }
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, ".");
+    const modules: { [moduleName: string]: string } = {};
+
+    parsed.fileNames
+      .filter(fileName => fileName.indexOf(`${join("src", "")}`) === 0 && fileName.endsWith(".ts") && !fileName.endsWith(".d.ts"))
+      .forEach(fileName => {
+        const source = readFileSync(fileName).toString();
+        const output = ts.transpileModule(source, {
+          compilerOptions: {
+            module: ts.ModuleKind.CommonJS,
+            target: ts.ScriptTarget.ES2018,
+            esModuleInterop: true,
+            experimentalDecorators: true
+          },
+          fileName
+        });
+        const moduleName = relative("src", fileName).replace(/\\/g, "/").replace(/\.ts$/, "");
+
+        modules[moduleName] = output.outputText;
+      });
+
+    return modules;
   }
 
   private captureServerEvents(): void {
@@ -292,6 +323,42 @@ export class IntegrationTestHelper {
     }
 
     return this._server.world.gameTime;
+  }
+
+  private async runPlayerRuntime(): Promise<void> {
+    if (this._player === undefined) {
+      return;
+    }
+
+    // screeps-server-mockup 的 engine_runner 子进程在新版 Node/native 组合下不稳定；
+    // 这里复用同一 driver runtime 执行当前 bot，仍然加载 dist/main.js 并写回 Memory/console。
+    const driver = this._server.driver;
+    const runResult = await driver.makeRuntime(this._player.id);
+
+    if (runResult.error !== undefined) {
+      this.capture(
+        "server",
+        `[runtime] error=${runResult.error} memory=${runResult.memory?.data?.length ?? 0} console=${
+          runResult.console === undefined ? 0 : JSON.stringify(runResult.console).length
+        }`
+      );
+    }
+
+    if (runResult.console !== undefined) {
+      await driver.sendConsoleMessages(this._player.id, runResult.console);
+    }
+
+    if (runResult.error !== undefined) {
+      await driver.sendConsoleError(this._player.id, runResult.error);
+    }
+
+    if (runResult.memory !== undefined) {
+      await driver.saveUserMemory(this._player.id, runResult.memory);
+    }
+
+    if (runResult.intents !== undefined) {
+      await driver.saveUserIntents(this._player.id, runResult.intents);
+    }
   }
 
   private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
