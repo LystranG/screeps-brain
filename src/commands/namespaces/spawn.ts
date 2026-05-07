@@ -47,7 +47,8 @@ export function createSpawnNamespace(): CommandNamespaceDefinition {
 
           return okResult(
             `spawn queue: id=${request.id} room=${request.roomName} role=${request.role} ` +
-              `priority=${request.priority} status=${request.status} attempts=${request.attempts} reason=${request.reason}`
+              `priority=${request.priority} status=${request.status} attempts=${request.attempts} ` +
+              `lastError=${request.lastError ?? "none"} reason=${request.reason}`
           );
         }
       },
@@ -117,6 +118,7 @@ function errorResult(message: string): CommandResult {
 
 function formatQueueCounts(roomName: string, queue: SpawnRequestMemory[]): string {
   const queued = queue.filter(request => request.status === "queued").length;
+  const waiting = queue.filter(request => request.status === "waiting").length;
   const blocked = queue.filter(request => request.status === "blocked").length;
   const validated = queue.filter(request => request.status === "validated").length;
   const spawning = queue.filter(request => request.status === "spawning").length;
@@ -124,7 +126,7 @@ function formatQueueCounts(roomName: string, queue: SpawnRequestMemory[]): strin
   const failed = queue.filter(request => request.status === "failed").length;
 
   return (
-    `${roomName}:queued=${queued} blocked=${blocked} validated=${validated} ` +
+    `${roomName}:queued=${queued} waiting=${waiting} blocked=${blocked} validated=${validated} ` +
     `spawning=${spawning} spawned=${spawned} failed=${failed}`
   );
 }
@@ -151,7 +153,7 @@ function selectTopQueuedRequest(memory: Memory): SpawnRequestMemory | null {
 
   for (const colony of Object.values(memory.colonies)) {
     for (const request of colony.spawnQueue) {
-      if (request.status === "queued") {
+      if (request.status === "queued" || request.status === "waiting") {
         requests.push(request);
       }
     }

@@ -70,15 +70,17 @@ describe("command inspection|env|sim", () => {
           "Sim setup needs at least one owned spawn; runtime code cannot create sources, spawns, or initial creeps.",
         lastSeenTick: 120,
         lastLoggedTick: 121,
-        flagName: "lystran-sim-spawn-needed"
+        flagName: "lystran-sim-spawn-needed",
+        active: true
       },
       "missing-controller": {
         message:
           "Sim setup needs a visible controller; runtime code cannot create sources, spawns, or initial creeps.",
         lastSeenTick: 122,
-        lastLoggedTick: 123
+        lastLoggedTick: 123,
+        active: true
       }
-    };
+    } as unknown as Memory["runtime"]["sim"]["guidance"];
     const namespace = createSimNamespace();
 
     const commandNames = namespace.commands.map(command => command.name);
@@ -120,6 +122,29 @@ describe("command inspection|env|sim", () => {
   it("reports no sim guidance when guidance memory is empty", () => {
     const namespace = createSimNamespace();
     const result = namespace.commands[1].run([], createContext(createInspectionMemory()));
+
+    assert.deepEqual(result, {
+      ok: true,
+      status: "OK",
+      message: "sim guidance: none",
+      effect: CommandEffect.readOnly
+    });
+  });
+
+  it("reports no sim guidance when all remembered guidance entries are inactive", () => {
+    const memory = createInspectionMemory();
+    memory.runtime.sim.guidance = {
+      "missing-source": {
+        message:
+          "Sim setup needs at least one visible source; runtime code cannot create sources, spawns, or initial creeps.",
+        lastSeenTick: 70,
+        lastLoggedTick: 71,
+        flagName: "lystran-sim-source-needed",
+        active: false
+      }
+    } as unknown as Memory["runtime"]["sim"]["guidance"];
+    const namespace = createSimNamespace();
+    const result = namespace.commands[1].run([], createContext(memory));
 
     assert.deepEqual(result, {
       ok: true,
@@ -388,7 +413,7 @@ describe("command inspection|spawn", () => {
           memory: { role: "worker" } as CreepMemory,
           reason: "bootstrap worker coverage",
           requestedTick: 99,
-          status: "queued",
+          status: "waiting",
           attempts: 1,
           lastError: "-6",
           lastTriedTick: null,
@@ -555,15 +580,16 @@ describe("command inspection|spawn", () => {
     assert.include(help, "cmd.spawn.status()");
     assert.include(help, "cmd.spawn.queue()");
     assert.include(help, "cmd.spawn.dryRun(room?, role?, energy?)");
-    assert.include(status.message, "W1N1:queued=1 blocked=0 validated=1 spawning=1 spawned=1 failed=0");
-    assert.include(status.message, "W2N2:queued=0 blocked=1 validated=0 spawning=0 spawned=0 failed=0");
+    assert.include(status.message, "W1N1:queued=0 waiting=1 blocked=0 validated=1 spawning=1 spawned=1 failed=0");
+    assert.include(status.message, "W2N2:queued=0 waiting=0 blocked=1 validated=0 spawning=0 spawned=0 failed=0");
     assert.include(status.message, "spawns=idle:1 busy:1");
     assert.include(queue.message, "id=spawn-worker-1");
     assert.include(queue.message, "room=W1N1");
     assert.include(queue.message, "role=worker");
     assert.include(queue.message, "priority=2");
-    assert.include(queue.message, "status=queued");
+    assert.include(queue.message, "status=waiting");
     assert.include(queue.message, "attempts=1");
+    assert.include(queue.message, "lastError=-6");
     assert.include(queue.message, "reason=bootstrap worker coverage");
     assert.include(dryRun.message, "spawn dryRun W1N1 worker:");
     assert.include(dryRun.message, "body=work,carry,move");
@@ -602,7 +628,7 @@ describe("command inspection|spawn", () => {
       memory: { role: "builder" },
       dryRun: true
     });
-    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "waiting");
   });
 
   it("registers spawn as active namespace instead of future placeholder", () => {

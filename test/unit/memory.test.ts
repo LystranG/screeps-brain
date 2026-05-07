@@ -811,7 +811,7 @@ describe("memory migrations", () => {
       },
       reason: "partial current memory",
       requestedTick: 30,
-      status: "queued",
+      status: "waiting",
       attempts: 1,
       lastError: "-6",
       lastTriedTick: null,

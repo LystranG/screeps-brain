@@ -3,7 +3,7 @@ import { createSpawnRequest, enqueueSpawnRequest } from "spawning/queue";
 import { BootstrapSlot } from "bootstrap/slots";
 import { ColonyContext } from "colony/types";
 
-const ACTIVE_REQUEST_STATUSES: readonly SpawnRequestMemory["status"][] = ["queued", "validated", "spawning"];
+const ACTIVE_REQUEST_STATUSES: readonly SpawnRequestMemory["status"][] = ["queued", "waiting", "validated", "spawning"];
 
 export interface BootstrapSpawnDemandSummary {
   created: number;

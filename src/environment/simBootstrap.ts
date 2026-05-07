@@ -39,6 +39,10 @@ interface FlagGuidanceRoom {
   };
 }
 
+interface RemovableFlag {
+  remove?: () => ScreepsReturnCode;
+}
+
 const FIND_SOURCES_CONSTANT = 105 as FIND_SOURCES;
 const ERR_NAME_EXISTS_CODE = -3 as ERR_NAME_EXISTS;
 
@@ -197,6 +201,14 @@ function updateGuidance(
 function updateFlagGuidance(memory: Memory, game: Game, activeCodes: string[]): void {
   const flagPosition = findFlagGuidancePosition(game.rooms);
 
+  Object.keys(memory.runtime.sim.guidance).forEach(code => {
+    if (activeCodes.indexOf(code) >= 0) {
+      return;
+    }
+
+    removeResolvedGuidanceFlag(memory, game, code);
+  });
+
   activeCodes.forEach(code => {
     const flagName = GuidanceFlagName[code];
 
@@ -230,6 +242,30 @@ function updateFlagGuidance(memory: Memory, game: Game, activeCodes: string[]): 
 
     entry.flagResult = `error:${result}`;
   });
+}
+
+function removeResolvedGuidanceFlag(memory: Memory, game: Game, code: string): void {
+  const entry = memory.runtime.sim.guidance[code] as SimGuidanceEntryState;
+  const flagName = entry.flagName ?? GuidanceFlagName[code];
+
+  if (!flagName) {
+    return;
+  }
+
+  const flag = game.flags[flagName] as RemovableFlag | undefined;
+
+  if (!flag || typeof flag.remove !== "function") {
+    if (entry.flagResult === "created" || entry.flagResult === "exists") {
+      entry.flagResult = "resolved";
+    }
+
+    return;
+  }
+
+  const result = flag.remove();
+
+  entry.flagName = flagName;
+  entry.flagResult = result === OK ? "removed" : `remove-error:${result}`;
 }
 
 function findFlagGuidancePosition(

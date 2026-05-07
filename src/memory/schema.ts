@@ -33,6 +33,8 @@ export interface SimGuidanceMemory {
     lastSeenTick?: number;
     lastLoggedTick?: number;
     flagName?: string;
+    flagResult?: string;
+    active?: boolean;
   };
 }
 
@@ -124,7 +126,7 @@ export interface SpawnRequestMemory {
   memory: CreepMemory;
   reason: string;
   requestedTick: number;
-  status: "queued" | "validating" | "validated" | "blocked" | "spawning" | "spawned" | "failed";
+  status: "queued" | "waiting" | "validating" | "validated" | "blocked" | "spawning" | "spawned" | "failed";
   attempts: number;
   lastError: string | null;
   lastTriedTick: number | null;

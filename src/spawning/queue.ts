@@ -75,16 +75,17 @@ export function selectNextSpawnRequest(
   contexts: ColonyContext[],
   memory: ProjectMemoryShape
 ): SelectedSpawnRequest | null {
-  return selectNextSpawnRequestByStatus(contexts, memory, "queued");
+  return selectNextSpawnRequestByStatus(contexts, memory, ["queued", "waiting"]);
 }
 
 export function selectNextSpawnRequestByStatus(
   contexts: ColonyContext[],
   memory: ProjectMemoryShape,
-  status: SpawnRequestMemory["status"]
+  status: SpawnRequestMemory["status"] | readonly SpawnRequestMemory["status"][]
 ): SelectedSpawnRequest | null {
   const contextByRoomName = createContextByRoomName(contexts);
   const candidates: SelectedSpawnRequest[] = [];
+  const selectedStatuses = Array.isArray(status) ? status : [status];
 
   for (const colony of Object.values(memory.colonies)) {
     const context = contextByRoomName.get(colony.roomName);
@@ -96,7 +97,7 @@ export function selectNextSpawnRequestByStatus(
     const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
 
     for (const request of queue) {
-      if (request.status === status && isUsableSpawnCandidate(context, request, status)) {
+      if (selectedStatuses.includes(request.status) && isUsableSpawnCandidate(context, request, request.status)) {
         candidates.push({ context, request });
       }
     }
@@ -122,7 +123,7 @@ export function inspectSpawnQueueStatus(contexts: ColonyContext[], memory: Proje
     const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
 
     for (const request of queue) {
-      if (request.status !== "queued") {
+      if (request.status !== "queued" && request.status !== "waiting") {
         continue;
       }
 
@@ -182,6 +183,10 @@ export function markSpawnRequestWaiting(
   request.lastError = String(code);
   request.lastTriedTick = tick;
   request.requestedTick = tick;
+
+  if (request.status === "queued" || request.status === "validated" || request.status === "waiting") {
+    request.status = "waiting";
+  }
 
   return {
     ok: true,

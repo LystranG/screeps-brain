@@ -128,6 +128,11 @@ export class IntegrationTestHelper {
     return JSON.parse(memory) as ProjectMemoryShape;
   }
 
+  public async writeMemory(memory: ProjectMemoryShape): Promise<void> {
+    const env = this._server.common.storage.env;
+    await env.set(env.keys.MEMORY + this._player.id, JSON.stringify(memory));
+  }
+
   public async runCommand(command: string): Promise<string> {
     const beforeCount = this.consoleEntries.length;
     await this._player.console(command);
@@ -231,6 +236,19 @@ export class IntegrationTestHelper {
     await db["rooms.objects"].removeWhere({ room: roomName, type });
   }
 
+  public async setSpawnEnergy(roomName: string, energy: number): Promise<void> {
+    const { db } = await this._server.world.load();
+    await db["rooms.objects"].update({ room: roomName, type: "spawn" }, { $set: { store: { energy } } });
+  }
+
+  public async setSpawnEnergyCapacity(roomName: string, energyCapacity: number): Promise<void> {
+    const { db } = await this._server.world.load();
+    await db["rooms.objects"].update(
+      { room: roomName, type: "spawn" },
+      { $set: { storeCapacityResource: { energy: energyCapacity } } }
+    );
+  }
+
   public configureShardName(shardName: string): void {
     const engineConfig = this._server.driver.config;
     const marker = `__lystranShardName_${this.scenario.name.replace(/[^A-Za-z0-9_]/g, "_")}`;
@@ -264,15 +282,23 @@ export class IntegrationTestHelper {
     this.consoleEntries = this.consoleEntries.slice(-RECENT_DIAGNOSTIC_LIMIT * 3);
   }
 
-  private async addWorkerCreep(roomName: string): Promise<void> {
+  public async addWorkerCreep(
+    roomName: string,
+    name = "WorkerPrimary",
+    options: {
+      spawning?: boolean;
+    } = {}
+  ): Promise<void> {
     const { C, db } = await this._server.world.load();
+    const spawning = options.spawning === true;
+
     await db["rooms.objects"].insert({
       room: roomName,
       type: "creep",
       x: 16,
       y: 15,
       user: this._player.id,
-      name: "WorkerPrimary",
+      name,
       body: [
         { type: C.WORK, hits: 100 },
         { type: C.CARRY, hits: 100 },
@@ -283,7 +309,7 @@ export class IntegrationTestHelper {
       store: { energy: 0 },
       storeCapacityResource: { energy: 50 },
       fatigue: 0,
-      spawning: false,
+      spawning,
       ageTime: 1500,
       notifyWhenAttacked: true
     });

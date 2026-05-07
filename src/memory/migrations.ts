@@ -503,6 +503,9 @@ function repairSpawnRequest(roomName: string, request: unknown, index: number): 
   const requestId = typeof candidate.id === "string" ? candidate.id : `repaired-spawn-request-${index}`;
   const requestRoomName = typeof candidate.roomName === "string" ? candidate.roomName : roomName;
 
+  const status = isSpawnRequestStatus(candidate.status) ? candidate.status : "queued";
+  const lastError = candidate.lastError === null || typeof candidate.lastError === "string" ? candidate.lastError : null;
+
   return {
     id: requestId,
     roomName: requestRoomName,
@@ -512,14 +515,26 @@ function repairSpawnRequest(roomName: string, request: unknown, index: number): 
     memory: repairCreepMemory(candidate.memory),
     reason: typeof candidate.reason === "string" ? candidate.reason : "repaired spawn request",
     requestedTick: typeof candidate.requestedTick === "number" ? candidate.requestedTick : 0,
-    status: isSpawnRequestStatus(candidate.status) ? candidate.status : "queued",
+    status: repairSpawnRequestStatus(status, lastError),
     attempts: typeof candidate.attempts === "number" ? candidate.attempts : 0,
-    lastError: candidate.lastError === null || typeof candidate.lastError === "string" ? candidate.lastError : null,
+    lastError,
     lastTriedTick: typeof candidate.lastTriedTick === "number" ? candidate.lastTriedTick : null,
     spawnName: candidate.spawnName === null || typeof candidate.spawnName === "string" ? candidate.spawnName : null,
     creepName: candidate.creepName === null || typeof candidate.creepName === "string" ? candidate.creepName : null,
     completedTick: typeof candidate.completedTick === "number" ? candidate.completedTick : null
   };
+}
+
+function repairSpawnRequestStatus(
+  status: SpawnRequestMemory["status"],
+  lastError: string | null
+): SpawnRequestMemory["status"] {
+  // 早期版本把可恢复的能量/忙碌错误只写到 lastError，status 仍停在 queued/validated。
+  if ((status === "queued" || status === "validated") && (lastError === "-6" || lastError === "-4")) {
+    return "waiting";
+  }
+
+  return status;
 }
 
 export function repairStrategyPlan(
@@ -564,6 +579,7 @@ function isRoleName(value: unknown): value is RoleName {
 function isSpawnRequestStatus(value: unknown): value is SpawnRequestMemory["status"] {
   return (
     value === "queued" ||
+    value === "waiting" ||
     value === "validating" ||
     value === "validated" ||
     value === "blocked" ||

@@ -9,6 +9,10 @@ interface GuidanceWithFlagResult {
   flagResult?: string;
 }
 
+interface RemovableFlag {
+  remove: sinon.SinonStub;
+}
+
 describe("environment|sim bootstrap|observability sim bootstrap|environment|kernel", () => {
   it("no-ops outside sim", () => {
     const game = createMockGame();
@@ -272,6 +276,50 @@ describe("environment|sim bootstrap|observability sim bootstrap|environment|kern
 
     assert.isTrue(result.ran);
     assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
+  });
+
+  it("removes guidance flags when the missing sim object is resolved", () => {
+    const game = createMockGame();
+    const memory = createMemoryWithDefaults();
+    const logger = new Logger({}, () => 70);
+    sinon.stub(logger, "warn");
+    sinon.stub(logger, "info");
+    const removeSourceFlag = sinon.stub().returns(OK);
+    const sourceFlag: RemovableFlag = { remove: removeSourceFlag };
+    const createFlag = sinon.stub().returns("lystran-sim-source-needed");
+
+    game.rooms = {
+      W1N1: {
+        controller: {
+          pos: {
+            createFlag
+          }
+        },
+        find: () => []
+      }
+    };
+
+    runSimBootstrap(memory, game as unknown as Game, logger, 70);
+    assert.equal(guidanceFlagResult(memory, "missing-source"), "created");
+
+    game.flags = {
+      "lystran-sim-source-needed": sourceFlag
+    };
+    game.rooms = {
+      W1N1: {
+        controller: {
+          pos: {
+            createFlag
+          }
+        },
+        find: () => [{ id: "source-ready" }]
+      }
+    };
+
+    runSimBootstrap(memory, game as unknown as Game, logger, 71);
+
+    assert.isTrue(removeSourceFlag.calledOnce);
+    assert.equal(guidanceFlagResult(memory, "missing-source"), "removed");
   });
 });
 

@@ -32,7 +32,7 @@ export function createSimNamespace(): CommandNamespaceDefinition {
         effect: CommandEffect.readOnly,
         run: (_args, context): CommandResult => {
           const guidance = context.memory.runtime.sim.guidance;
-          const codes = Object.keys(guidance);
+          const codes = Object.keys(guidance).filter(code => guidance[code].active === true);
 
           if (codes.length === 0) {
             return {

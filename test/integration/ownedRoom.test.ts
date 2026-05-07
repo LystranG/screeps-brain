@@ -82,10 +82,10 @@ describe("normal owned-room bootstrap", function () {
         }
 
         // screeps-server-mockup + direct runtime fallback can process spawn lifecycle intents
-        // without reliably exposing the spawned creep back to Game.creeps for the next role tick.
-        // When that mock-server boundary appears, spawned queue evidence plus a healthy bootstrap
-        // process is the stable automated fallback; live task status remains covered when exposed.
-        return queue.some(isSpawnedRequest) && memory.processes.bootstrapExecution.lastStatus === "ok";
+        // without reliably advancing the created creep through every live Game.creeps state.
+        // When that mock-server boundary appears, spawning/spawned queue evidence plus a healthy
+        // bootstrap process is the stable automated fallback; live task status remains covered when exposed.
+        return queue.some(isSpawnLifecycleProgressRequest) && memory.processes.bootstrapExecution.lastStatus === "ok";
       }, 250, "owned room harvest or upgrade progression");
 
       const progressedMemory = await scenario.readMemory();
@@ -93,7 +93,7 @@ describe("normal owned-room bootstrap", function () {
       if (hasTaskProgress(progressedMemory, "W1N1")) {
         assertTaskProgressed(progressedMemory, "W1N1");
       } else {
-        assert.isTrue(progressedMemory.colonies.W1N1.spawnQueue.some(isSpawnedRequest));
+        assert.isTrue(progressedMemory.colonies.W1N1.spawnQueue.some(isSpawnLifecycleProgressRequest));
         assert.equal(progressedMemory.processes.bootstrapExecution.lastStatus, "ok");
       }
     } finally {
@@ -114,4 +114,8 @@ function hasTaskProgress(memory: ProjectMemoryShape, roomName: string): boolean 
 
 function isSpawnedRequest(request: SpawnRequestMemory): boolean {
   return request.status === "spawned";
+}
+
+function isSpawnLifecycleProgressRequest(request: SpawnRequestMemory): boolean {
+  return request.status === "spawning" || request.status === "spawned";
 }

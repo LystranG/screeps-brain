@@ -56,7 +56,7 @@ function runQueuedValidation(
   memory: ProjectMemoryShape,
   tick: number
 ): SpawnValidationResult {
-  const selected = selectNextSpawnRequestByStatus(contexts, memory, "queued");
+  const selected = selectNextSpawnRequestByStatus(contexts, memory, ["queued", "waiting"]);
 
   if (!selected) {
     const queueStatus = inspectSpawnQueueStatus(contexts, memory);
@@ -216,6 +216,12 @@ function completeSpawnedRequests(
   game: Game,
   tick: number
 ): SpawnValidationResult | null {
+  const reconciled = reconcileVisibleBootstrapCreeps(contexts, memory, game, tick);
+
+  if (reconciled) {
+    return reconciled;
+  }
+
   const selected = selectNextSpawnRequestByStatus(contexts, memory, "spawning");
 
   if (!selected || !selected.request.creepName) {
@@ -223,6 +229,17 @@ function completeSpawnedRequests(
   }
 
   if (!game.creeps[selected.request.creepName]) {
+    if (isSpawnStillCreatingRequest(selected, game)) {
+      return {
+        ok: false,
+        status: "waiting",
+        reason: "spawn still creating creep",
+        roomName: selected.context.roomName,
+        requestId: selected.request.id,
+        spawnName: selected.request.spawnName ?? undefined
+      };
+    }
+
     return null;
   }
 
@@ -238,6 +255,117 @@ function completeSpawnedRequests(
   };
 }
 
+function reconcileVisibleBootstrapCreeps(
+  contexts: ColonyContext[],
+  memory: ProjectMemoryShape,
+  game: Game,
+  tick: number
+): SpawnValidationResult | null {
+  const contextByRoomName = new Map(contexts.map(context => [context.roomName, context]));
+
+  for (const colony of Object.values(memory.colonies)) {
+    const context = contextByRoomName.get(colony.roomName);
+
+    if (!context) {
+      continue;
+    }
+
+    for (const request of colony.spawnQueue) {
+      if (!isActiveSpawnRequestStatus(request.status)) {
+        continue;
+      }
+
+      const matchedCreep = findVisibleCreepForRequest(request.id, game.creeps);
+
+      if (!matchedCreep) {
+        continue;
+      }
+
+      const spawnName = request.spawnName ?? inferSpawnName(context);
+
+      if (matchedCreep.creep.spawning === true) {
+        markSpawnRequestSpawning(memory, request.roomName, request.id, spawnName ?? "", matchedCreep.name, tick);
+
+        if (!spawnName) {
+          request.spawnName = null;
+        }
+
+        return {
+          ok: true,
+          status: "spawning",
+          reason: "spawning creep matched spawn request id",
+          roomName: request.roomName,
+          requestId: request.id,
+          spawnName: request.spawnName ?? undefined
+        };
+      }
+
+      request.creepName = matchedCreep.name;
+      request.spawnName = spawnName;
+      markSpawnRequestSpawned(memory, request.roomName, request.id, tick);
+
+      return {
+        ok: true,
+        status: "spawned",
+        reason: "visible creep matched spawn request id",
+        roomName: request.roomName,
+        requestId: request.id,
+        spawnName: request.spawnName ?? undefined
+      };
+    }
+  }
+
+  return null;
+}
+
+function isActiveSpawnRequestStatus(status: SelectedSpawnRequest["request"]["status"]): boolean {
+  return status === "queued" || status === "waiting" || status === "validated" || status === "spawning";
+}
+
+function findVisibleCreepForRequest(
+  requestId: string,
+  creeps: Game["creeps"] | undefined
+): { name: string; creep: Creep } | null {
+  if (!creeps) {
+    return null;
+  }
+
+  const safeRequestId = sanitizeSpawnNameSegment(requestId);
+
+  for (const creepName of Object.keys(creeps)) {
+    if (creepName.indexOf(safeRequestId) >= 0) {
+      return {
+        name: creepName,
+        creep: creeps[creepName]
+      };
+    }
+  }
+
+  return null;
+}
+
+function inferSpawnName(context: ColonyContext): string | null {
+  if (context.spawns.length === 1) {
+    return context.spawns[0].name;
+  }
+
+  const spawningSpawn = context.spawns.find(spawn => spawn.spawning);
+
+  return spawningSpawn?.name ?? null;
+}
+
+function isSpawnStillCreatingRequest(selected: SelectedSpawnRequest, game: Game): boolean {
+  if (!selected.request.spawnName || !selected.request.creepName) {
+    return false;
+  }
+
+  const spawn =
+    game.spawns?.[selected.request.spawnName] ??
+    selected.context.spawns.find(candidate => candidate.name === selected.request.spawnName);
+
+  return spawn?.spawning?.name === selected.request.creepName;
+}
+
 function findIdleSpawn(context: ColonyContext): StructureSpawn | null {
   return context.spawns.find(spawn => !spawn.spawning) ?? null;
 }
@@ -249,7 +377,11 @@ function createDryRunName(selected: SelectedSpawnRequest, tick: number): string 
 function createSpawnName(selected: SelectedSpawnRequest, tick: number): string {
   const rawName = `bootstrap-${selected.request.role}-${selected.context.roomName}-${tick}-${selected.request.id}`;
 
-  return rawName.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 100);
+  return sanitizeSpawnNameSegment(rawName).slice(0, 100);
+}
+
+function sanitizeSpawnNameSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, "-");
 }
 
 function isRecoverableSpawnCode(code: ScreepsReturnCode): boolean {
