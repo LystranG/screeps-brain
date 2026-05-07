@@ -151,11 +151,12 @@ describe("command install|global cmd", () => {
     assert.isString(cmd.strategy.plan());
     assert.isString(cmd.strategy.explain());
     assert.include(cmd.help(), "cmd.env.help()");
-    assert.include(cmd.env.status(), "OK env status:");
-    assert.include(cmd.config.logLevel("debug"), "OK logLevel: debug -> debug");
-    assert.include(cmd.debug.dump("Memory.config", 200), "OK debug dump Memory.config:");
-    assert.include(cmd.strategy.status(), "OK strategy status:");
-    assert.include(cmd.spawn.status(), "OK spawn status:");
+    assert.include(cmd.env.status(), "\nOK\n");
+    assert.include(cmd.env.status(), "\nenv status:\n");
+    assert.include(cmd.config.logLevel("debug"), "\nlogLevel: debug -> debug\n");
+    assert.include(cmd.debug.dump("Memory.config", 200), "\ndebug dump Memory.config:\n");
+    assert.include(cmd.strategy.status(), "\nstrategy status:\n");
+    assert.include(cmd.spawn.status(), "\nspawn status:\n");
   });
 
   it("reuses same-version cmd and rebuilds stale version bindings", () => {

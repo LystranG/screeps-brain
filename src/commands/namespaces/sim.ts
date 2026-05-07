@@ -62,7 +62,7 @@ export function createSimNamespace(): CommandNamespaceDefinition {
           return {
             ok: true,
             status: "OK",
-            message: `sim guidance: ${entries.join("; ")}`,
+            message: `sim guidance:\n${entries.join("\n")}`,
             effect: CommandEffect.readOnly
           };
         }

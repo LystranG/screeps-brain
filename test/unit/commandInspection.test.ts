@@ -44,7 +44,9 @@ describe("command inspection|env|sim", () => {
     assert.equal(namespace.effect, CommandEffect.readOnly);
     assert.include(help, "cmd.env.status()");
     assert.include(help, "read-only");
-    assert.include(formatCommandResult(result), "OK env status:");
+    assert.include(formatCommandResult(result), "\nOK\n");
+    assert.include(formatCommandResult(result), "\nenv status:\n");
+    assert.include(formatCommandResult(result), "\ntype=world\n");
     assert.include(result.message, "type=world");
     assert.include(result.message, "shard=shard1");
     assert.include(result.message, "visibleRooms=2");
@@ -103,6 +105,16 @@ describe("command inspection|env|sim", () => {
     assert.include(guidance.message, "lastSeenTick=120");
     assert.include(guidance.message, "lastLoggedTick=121");
     assert.include(guidance.message, "flagName=lystran-sim-spawn-needed");
+    assert.include(formatCommandResult(guidance), "\nOK\n");
+    assert.include(formatCommandResult(guidance), "\nsim guidance:\n");
+    assert.include(
+      formatCommandResult(guidance),
+      "\nmissing-spawn message=Sim setup needs at least one owned spawn; runtime code cannot create sources, spawns, or initial creeps. lastSeenTick=120 lastLoggedTick=121 flagName=lystran-sim-spawn-needed\n"
+    );
+    assert.include(
+      formatCommandResult(guidance),
+      "\nmissing-controller message=Sim setup needs a visible controller; runtime code cannot create sources, spawns, or initial creeps. lastSeenTick=122 lastLoggedTick=123\n"
+    );
   });
 
   it("reports no sim guidance when guidance memory is empty", () => {
@@ -194,7 +206,8 @@ describe("command inspection|debug|dump", () => {
     const rejectedPath = dump.run(["screeps.json"], createContext(memory));
     const rejectedLength = dump.run(["Memory.config", 0], createContext(memory));
 
-    assert.include(formatCommandResult(configDump), "OK debug dump Memory.config:");
+    assert.include(formatCommandResult(configDump), "\nOK\n");
+    assert.include(formatCommandResult(configDump), "\ndebug dump Memory.config:\n");
     assert.isAtMost(configDump.message.length, 230);
     assert.include(truncatedDump.message, "...");
     assert.equal(rejectedPath.status, "ERR");

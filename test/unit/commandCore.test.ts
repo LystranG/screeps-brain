@@ -86,7 +86,7 @@ describe("command core|formatter|help", () => {
         message: "logLevel: info -> debug",
         effect: CommandEffect.writesMemory
       }),
-      "OK logLevel: info -> debug"
+      ["----------------------------------------", "OK", "logLevel: info -> debug", "----------------------------------------"].join("\n")
     );
     assert.equal(
       formatCommandResult({
@@ -95,8 +95,45 @@ describe("command core|formatter|help", () => {
         message: "Log level must be one of: debug, info, warn, error",
         effect: CommandEffect.readOnly
       }),
-      "ERR Log level must be one of: debug, info, warn, error"
+      [
+        "----------------------------------------",
+        "ERR",
+        "Log level must be one of: debug, info, warn, error",
+        "----------------------------------------"
+      ].join("\n")
     );
+  });
+
+  it("splits compact key-value command messages onto separate lines", () => {
+    assert.equal(
+      formatCommandResult({
+        ok: true,
+        status: "OK",
+        message: "env status: type=sim shard=sim rooms=1 spawns=1 creeps=2 cpu=available",
+        effect: CommandEffect.readOnly
+      }),
+      [
+        "----------------------------------------",
+        "OK",
+        "env status:",
+        "type=sim",
+        "shard=sim",
+        "rooms=1",
+        "spawns=1",
+        "creeps=2",
+        "cpu=available",
+        "----------------------------------------"
+      ].join("\n")
+    );
+  });
+
+  it("wraps help output in the same readable block", () => {
+    const help = renderRootHelp(namespaces);
+
+    assert.equal(help.split("\n")[0], "----------------------------------------");
+    assert.equal(help.split("\n")[help.split("\n").length - 1], "----------------------------------------");
+    assert.include(help, "\ncmd.help()\n");
+    assert.include(help, "\ncmd.env.help() [read-only] Inspect the current Screeps runtime environment.\n");
   });
 
   it("renders root help from namespace metadata", () => {
