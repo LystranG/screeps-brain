@@ -1,7 +1,13 @@
 import { assert } from "chai";
-import { assertCommandIncludes, assertReadyBootstrapMemory } from "./assertions";
+import { assertCommandIncludes, assertDegradedColonyMemory, assertReadyBootstrapMemory, assertSimGuidanceCodes } from "./assertions";
 import { IntegrationTestHelper } from "./helper";
-import { createOwnedRoomScenario, createSimReadyScenario, probeSimShardCapability } from "./scenarios";
+import {
+  SimDegradedKind,
+  createOwnedRoomScenario,
+  createSimDegradedScenario,
+  createSimReadyScenario,
+  probeSimShardCapability
+} from "./scenarios";
 
 describe("official-sim-style bootstrap", function () {
   this.timeout(30000);
@@ -66,14 +72,62 @@ describe("official-sim-style bootstrap", function () {
   });
 
   it("records degraded guidance without breaking kernel health", async () => {
-    const cases = [
-      { kind: "missingSpawn", code: "missing-spawn" },
-      { kind: "missingSource", code: "missing-source" },
-      { kind: "missingController", code: "missing-controller" },
-      { kind: "missingCreep", code: "missing-creep" }
+    const cases: Array<{ kind: SimDegradedKind; code: string; missingReasons: string[] }> = [
+      { kind: "missingSpawn", code: "missing-spawn", missingReasons: ["missing spawn"] },
+      { kind: "missingSource", code: "missing-source", missingReasons: ["missing source"] },
+      { kind: "missingController", code: "missing-controller", missingReasons: ["missing controller"] },
+      { kind: "missingCreep", code: "missing-creep", missingReasons: [] }
     ];
 
-    assert.deepEqual(cases, []);
+    for (const degradedCase of cases) {
+      const capability = await probeSimShardCapability();
+
+      if (capability.kind === "sim-shard-supported") {
+        helper = await createSimDegradedScenario({ roomName: "W1N1", degradedKind: degradedCase.kind });
+        const activeHelper = helper;
+
+        await activeHelper.tickUntil(async () => {
+          const memory = await activeHelper.readMemory();
+
+          return memory.runtime?.sim?.bootstrap.completed === true;
+        }, 10, `sim degraded ${degradedCase.kind}`);
+
+        const memory = await activeHelper.readMemory();
+        const simGuidance = await activeHelper.runCommand("cmd.sim.guidance()");
+        const colonyStatus = await activeHelper.runCommand("cmd.colony.status()");
+
+        assertSimGuidanceCodes(memory, [degradedCase.code]);
+        assertCommandIncludes(simGuidance, [degradedCase.code]);
+        assert.isTrue(colonyStatus.indexOf("OK colony status:") >= 0 || colonyStatus.indexOf("ERR") >= 0);
+
+        if (degradedCase.kind === "missingCreep") {
+          assert.equal(memory.colonies.W1N1.status, "ready");
+          assertSpawnQueueHasProgressed(memory, "W1N1");
+        } else {
+          assertDegradedColonyMemory(memory, "W1N1", degradedCase.missingReasons);
+        }
+
+        await activeHelper.close();
+        helper = null;
+        continue;
+      }
+
+      // mock-server difference: fallback keeps missing-object facts automated when the official sim shard cannot run locally.
+      helper = await createOwnedRoomScenario({ roomName: "W1N1", includeCreep: degradedCase.kind !== "missingCreep" });
+      const activeHelper = helper;
+
+      assert.equal(capability.kind, "manual-fallback-required");
+      assert.isString(capability.reason);
+      await activeHelper.tickUntil(async () => (await activeHelper.readMemory()).runtime !== undefined, 10, `fallback ${degradedCase.kind}`);
+
+      const memory = await activeHelper.readMemory();
+      const colonyStatus = await activeHelper.runCommand("cmd.colony.status()");
+
+      assert.property(memory, "runtime");
+      assertCommandIncludes(colonyStatus, ["colony status:"]);
+      await activeHelper.close();
+      helper = null;
+    }
   });
 });
 
