@@ -51,6 +51,7 @@ export class IntegrationTestHelper {
   private consoleEntries: ConsoleEntry[] = [];
   private _server: any;
   private _player: any;
+  private shardSandboxListener?: (sandbox: { run(code: string): void }) => void;
 
   public constructor(scenario?: IntegrationScenario, serverOptions: ServerOptions = {}) {
     this.scenario =
@@ -92,6 +93,11 @@ export class IntegrationTestHelper {
   public async close(): Promise<void> {
     if (this._server === undefined) {
       return;
+    }
+
+    if (this.shardSandboxListener !== undefined) {
+      this._server.driver.config.off("playerSandbox", this.shardSandboxListener);
+      this.shardSandboxListener = undefined;
     }
 
     await Promise.resolve(this._server.stop());
@@ -231,9 +237,10 @@ export class IntegrationTestHelper {
     const engineConfig = this._server.driver.config;
     const marker = `__lystranShardName_${this.scenario.name.replace(/[^A-Za-z0-9_]/g, "_")}`;
 
-    engineConfig.on("playerSandbox", (sandbox: { run(code: string): void }) => {
+    this.shardSandboxListener = (sandbox: { run(code: string): void }) => {
       sandbox.run(`global.${marker} = "${shardName}"; Game.shard.name = global.${marker};`);
-    });
+    };
+    engineConfig.on("playerSandbox", this.shardSandboxListener);
   }
 
   private loadModules(): { main: string } {

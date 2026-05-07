@@ -74,7 +74,7 @@ npm run push-sim
 2. 运行 `cmd.sim.status()`：正常应包含 sim bootstrap 状态、ready 或 degraded 判断、最近 tick 信息。
 3. 运行 `cmd.sim.guidance()`：ready sim 应没有阻断性 missing code；degraded sim 会显示 `missing-spawn`、`missing-source`、`missing-controller` 等原因和人工 setup 指引。
 4. 运行 `cmd.colony.status()`：ready 房间应能看到 colony ready、process 状态和房间名；缺对象时应显示 degraded，而不是 kernel 崩溃。
-5. 运行 `cmd.spawn.queue()`：有 spawn 且能量/需求满足时，队列应从 pending/validated 逐步变成 spawning/complete 或保持可解释状态。
+5. 运行 `cmd.spawn.queue()` 和 `cmd.spawn.status()`：有 spawn 且能量/需求满足时，队列应从 queued/validating/validated 逐步变成 spawning/spawned，或进入 blocked/failed 等可解释状态。
 
 官方 sim 与本地 mock-server 的已知差异：
 
@@ -126,7 +126,7 @@ npm run push-season
 | colony 列表 | 多房间或看不到房间时 | `cmd.colony.list()` | owned room 名称、status | 列表为空或目标房间缺失 |
 | 单房间细节 | 排查指定房间 | `cmd.colony.detail("W1N1")` | controller/source/spawn/intel/process | `missing-spawn`、`missing-source`、`missing-controller` |
 | spawn 生命周期 | worker 没出现时 | `cmd.spawn.status()` | spawn 名称、room、busy/idle、last result | spawn 不存在、busy 长期不释放、错误码反复出现 |
-| spawn 队列 | 需求不消费时 | `cmd.spawn.queue()` | queue length、request status、role | pending/validated 长期不变，或失败原因不可解释 |
+| spawn 队列 | 需求不消费时 | `cmd.spawn.queue()` / `cmd.spawn.status()` | queue length、request status、role | queued/validated 长期不变，blocked/failed 原因不可解释 |
 | spawn 试算 | 上传后不确定能否生成 | `cmd.spawn.dryRun("W1N1")` | body/cost/ok 或可解释错误 | 能量足够却持续 dry-run 失败 |
 | 策略状态 | 验证策略层不直接执行高风险动作 | `cmd.strategy.status()` | active/refresh/gated policy | 高风险 intent 未被 gate，或状态长期 missing |
 | 策略计划 | 查看单房间计划 | `cmd.strategy.plan("W1N1")` | room、intent、reason、gate | 无计划且 refresh 原因不可见 |
@@ -151,7 +151,7 @@ npm run push-season
 
 ### Symptom -> checks -> fix: spawn queue 不消费
 
-- Symptom：`cmd.spawn.queue()` 中 spawn queue 长期停在 pending/validated/running，worker 没有生成。
+- Symptom：`cmd.spawn.queue()` 或 `cmd.spawn.status()` 中 spawn queue 长期停在 queued/validated/spawning，worker 没有生成。
 - checks：运行 `cmd.spawn.status()` 查看 spawn 是否 busy 或缺失；运行 `cmd.spawn.dryRun("W1N1")` 看 body/cost/energy 是否可行；运行 `cmd.colony.detail("W1N1")` 看 missing reasons。
 - fix：补齐 spawn 和能量前置条件；若 dry-run 给出明确错误，按错误处理；若条件满足但仍不消费，再把队列状态、spawn 状态和最近 tick 作为 runtime bug 证据。
 
