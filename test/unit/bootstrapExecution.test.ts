@@ -289,6 +289,48 @@ describe("bootstrap execution spawn demand", () => {
       assert.equal(memory.colonies.W1N1.spawnQueue[0].requestedTick, 264);
     }
   });
+
+  it("replenishes a dead spawned bootstrap creep by replacing its terminal slot request", () => {
+    const memory = createMemory();
+    const context = createContext({
+      spawns: [createSpawn("Spawn1")],
+      sources: [createSource("source-a")],
+      controller: createController("controller-a"),
+      creeps: []
+    });
+    const sourceSlot = buildBootstrapSlots(context, memory, 265).slots.find(slot => {
+      return slot.id === "source:source-a:0";
+    });
+
+    assert.isDefined(sourceSlot);
+
+    const deadCreepRequest = createSpawnRequest({
+      id: `bootstrap:W1N1:${sourceSlot?.id}:worker`,
+      roomName: "W1N1",
+      role: RoleName.worker,
+      priority: 20,
+      body: ["work", "carry", "move"],
+      memory: { role: RoleName.worker } as CreepMemory,
+      reason: "previously spawned worker",
+      requestedTick: 240
+    });
+    deadCreepRequest.status = "spawned";
+    deadCreepRequest.spawnName = "Spawn1";
+    deadCreepRequest.creepName = "DeadWorker";
+    deadCreepRequest.completedTick = 245;
+    enqueueSpawnRequest(memory, deadCreepRequest);
+
+    const replenishment = applyBootstrapSpawnDemand([sourceSlot as BootstrapSlot], memory, context, 265);
+
+    assert.equal(replenishment.created, 1);
+    assert.equal(replenishment.duplicate, 0);
+    assert.lengthOf(memory.colonies.W1N1.spawnQueue, 1);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].id, deadCreepRequest.id);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "queued");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].requestedTick, 265);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].creepName, null);
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].completedTick, null);
+  });
 });
 
 describe("bootstrap execution task assignment", () => {

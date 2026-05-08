@@ -574,6 +574,84 @@ describe("spawn primitives lifecycle runner", () => {
     assert.equal(request.lastError, "-3");
     assert.equal(request.lastTriedTick, 61);
   });
+
+  it("documents the spawn lifecycle state matrix with stable request evidence", () => {
+    const cases: Array<{
+      name: string;
+      initialStatus: "queued" | "waiting" | "validated";
+      returnCode: ScreepsReturnCode;
+      expectedResultStatus: "validated" | "spawning" | "waiting" | "failed";
+      expectedStoredStatus: "validated" | "spawning" | "waiting" | "failed";
+      expectedLastError: string | null;
+      expectedAttempts: number;
+    }> = [
+      {
+        name: "queued recoverable dry-run",
+        initialStatus: "queued",
+        returnCode: ERR_NOT_ENOUGH_ENERGY,
+        expectedResultStatus: "waiting",
+        expectedStoredStatus: "waiting",
+        expectedLastError: "-6",
+        expectedAttempts: 0
+      },
+      {
+        name: "waiting recovered dry-run",
+        initialStatus: "waiting",
+        returnCode: OK,
+        expectedResultStatus: "validated",
+        expectedStoredStatus: "validated",
+        expectedLastError: null,
+        expectedAttempts: 0
+      },
+      {
+        name: "validated real spawn",
+        initialStatus: "validated",
+        returnCode: OK,
+        expectedResultStatus: "spawning",
+        expectedStoredStatus: "spawning",
+        expectedLastError: null,
+        expectedAttempts: 0
+      },
+      {
+        name: "validated fatal spawn",
+        initialStatus: "validated",
+        returnCode: ERR_NAME_EXISTS,
+        expectedResultStatus: "failed",
+        expectedStoredStatus: "failed",
+        expectedLastError: "-3",
+        expectedAttempts: 1
+      }
+    ];
+
+    for (const stateCase of cases) {
+      const memory = createMemoryWithDefaults();
+      const request = createSpawnRequest({
+        id: `spawn-worker-matrix-${stateCase.name}`,
+        roomName: "W1N1",
+        role: "worker",
+        priority: 1,
+        body: ["work", "carry", "move"],
+        memory: { role: "worker" } as CreepMemory,
+        reason: stateCase.name,
+        requestedTick: 80
+      });
+      request.status = stateCase.initialStatus;
+      request.lastError = stateCase.initialStatus === "waiting" ? "-6" : null;
+      enqueueSpawnRequest(memory, request);
+
+      const result = runSpawnLifecycle(
+        [createContext("W1N1", true, [createSpawn("Spawn1", false, stateCase.returnCode)])],
+        memory,
+        { creeps: {} } as Game,
+        81
+      );
+
+      assert.equal(result.status, stateCase.expectedResultStatus, stateCase.name);
+      assert.equal(request.status, stateCase.expectedStoredStatus, stateCase.name);
+      assert.equal(request.lastError, stateCase.expectedLastError, stateCase.name);
+      assert.equal(request.attempts, stateCase.expectedAttempts, stateCase.name);
+    }
+  });
 });
 
 describe("spawn primitives spawn queue", () => {
