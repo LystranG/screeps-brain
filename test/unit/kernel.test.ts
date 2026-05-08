@@ -7,7 +7,7 @@ import { CURRENT_MEMORY_VERSION, createDefaultProjectMemorySections, createDefau
 import { createSpawnRequest } from "spawning/queue";
 import { createTaskMemory, TaskType } from "tasks/model";
 import { Kernel, LifecycleStageOverrides } from "../../src/runtime/Kernel";
-import { KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
+import { KERNEL_LIFECYCLE_STAGES, KERNEL_STAGE_ORDER, LifecycleStageName } from "../../src/runtime/lifecycle";
 import { createMockGame, createMockMemory, createMockRoom, mockGame, mockMemory } from "./mock";
 
 describe("kernel|stats cleanup|kernel runtime kernel", () => {
@@ -74,6 +74,14 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
       "installCommands",
       "detectEnvironmentBootstrap"
     ]);
+  });
+
+  it("defines lifecycle stages as ordered stage objects with light module entry runners", () => {
+    assert.deepEqual(
+      KERNEL_LIFECYCLE_STAGES.map(stage => stage.name),
+      [...KERNEL_STAGE_ORDER]
+    );
+    assert.isTrue(KERNEL_LIFECYCLE_STAGES.every(stage => typeof stage.run === "function"));
   });
 
   it("blocks later stages when migration fails", () => {
