@@ -1,9 +1,9 @@
 import { CommandContext, CommandNamespaceDefinition, CommandResult } from "commands/types";
 import { CommandEffect, CommandPath } from "constants/commands";
+import { buildBody, calculateBodyCost } from "spawning/bodyBuilder";
 import { ColonyContext } from "colony/types";
 import { RoleName } from "constants/roles";
 import { SpawnRequestMemory } from "memory/schema";
-import { buildBody } from "spawning/bodyBuilder";
 import { buildColonyContexts } from "colony/context";
 
 const DefaultRole: RoleName = "worker";
@@ -47,8 +47,8 @@ export function createSpawnNamespace(): CommandNamespaceDefinition {
 
           return okResult(
             `spawn queue: id=${request.id} room=${request.roomName} role=${request.role} ` +
-              `priority=${request.priority} status=${request.status} attempts=${request.attempts} ` +
-              `lastError=${request.lastError ?? "none"} reason=${request.reason}`
+              `priority=${request.priority} status=${request.status} attempts=${request.attempts} body=${request.body.join(",")} ` +
+              `cost=${calculateBodyCost(request.body)} lastError=${request.lastError ?? "none"} reason=${request.reason}`
           );
         }
       },

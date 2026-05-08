@@ -107,8 +107,10 @@ describe("spawn primitives dry-run runner", () => {
     );
 
     assert.isFalse(noIdleSpawn.ok);
-    assert.equal(noIdleSpawn.status, "skipped");
+    assert.equal(noIdleSpawn.status, "waiting");
     assert.equal(noIdleSpawn.reason, "no idle spawn in colony");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].status, "waiting");
+    assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "no idle spawn in colony");
   });
 
   it("dry-runs spawnCreep and marks requests validated on OK", () => {
@@ -201,6 +203,63 @@ describe("spawn primitives dry-run runner", () => {
     assert.equal(memory.colonies.W1N1.spawnQueue[0].attempts, 0);
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastError, "-4");
     assert.equal(memory.colonies.W1N1.spawnQueue[0].lastTriedTick, 34);
+  });
+
+  it("records oversized queued requests as waiting instead of hiding them from lifecycle selection", () => {
+    const memory = createMemoryWithDefaults();
+    const spawn = createSpawn("Spawn1");
+    const request = createSpawnRequest({
+      id: "spawn-harvester-oversized",
+      roomName: "W1N1",
+      role: "harvester",
+      priority: 1,
+      body: ["work", "work", "carry", "move"],
+      memory: { role: "harvester" } as CreepMemory,
+      reason: "preferred harvest body exceeds current spawn capacity",
+      requestedTick: 34
+    });
+    enqueueSpawnRequest(memory, request);
+
+    const result = runSpawnValidation([createContext("W1N1", true, [spawn], 200)], memory, {} as Game, 35);
+
+    assert.isFalse(result.ok);
+    assert.equal(result.status, "waiting");
+    assert.equal(result.reason, "body cost exceeds spawn capacity");
+    assert.equal(result.requestId, "spawn-harvester-oversized");
+    assert.equal(request.status, "waiting");
+    assert.equal(request.lastError, "body cost exceeds spawn capacity");
+    assert.equal(request.lastTriedTick, 35);
+    assert.equal(spawn.calls.length, 0);
+  });
+
+  it("records queued requests as waiting when colony readiness prevents selection", () => {
+    const memory = createMemoryWithDefaults();
+    const request = createSpawnRequest({
+      id: "spawn-worker-degraded",
+      roomName: "W1N1",
+      role: "worker",
+      priority: 1,
+      body: ["work", "carry", "move"],
+      memory: { role: "worker" } as CreepMemory,
+      reason: "degraded colony selection",
+      requestedTick: 35
+    });
+    enqueueSpawnRequest(memory, request);
+
+    const result = runSpawnValidation(
+      [createContext("W1N1", true, [createSpawn("Spawn1")], 300, "degraded", ["missing source"])],
+      memory,
+      {} as Game,
+      36
+    );
+
+    assert.isFalse(result.ok);
+    assert.equal(result.status, "waiting");
+    assert.equal(result.reason, "colony not ready: missing source");
+    assert.equal(result.requestId, "spawn-worker-degraded");
+    assert.equal(request.status, "waiting");
+    assert.equal(request.lastError, "colony not ready: missing source");
+    assert.equal(request.lastTriedTick, 36);
   });
 
   it("validates a later secondary request when the primary candidate has no idle spawn", () => {
@@ -826,12 +885,19 @@ function createMemoryWithDefaults(): Memory {
   };
 }
 
-function createContext(roomName: string, primary: boolean, spawns: StructureSpawn[] = []): ColonyContext {
+function createContext(
+  roomName: string,
+  primary: boolean,
+  spawns: StructureSpawn[] = [],
+  spawnCapacity = 300,
+  readiness: ColonyContext["readiness"] = "ready",
+  missingReasons: string[] = []
+): ColonyContext {
   return {
     roomName,
     primary,
-    readiness: "ready",
-    missingReasons: [],
+    readiness,
+    missingReasons,
     room: { name: roomName } as Room,
     controller: null,
     spawns,
@@ -840,9 +906,9 @@ function createContext(roomName: string, primary: boolean, spawns: StructureSpaw
     constructionSites: [],
     hostiles: [],
     energy: {
-      available: 300,
-      capacity: 300,
-      spawnCapacity: 300
+      available: spawnCapacity,
+      capacity: spawnCapacity,
+      spawnCapacity
     },
     stage: {
       rcl: 1,
@@ -865,9 +931,9 @@ function createContext(roomName: string, primary: boolean, spawns: StructureSpaw
       hostiles: [],
       controller: null,
       energy: {
-        available: 300,
-        capacity: 300,
-        spawnCapacity: 300
+        available: spawnCapacity,
+        capacity: spawnCapacity,
+        spawnCapacity
       },
       scannedTick: 1
     }

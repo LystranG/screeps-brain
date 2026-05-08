@@ -27,6 +27,10 @@ export interface SelectedSpawnRequest {
   request: SpawnRequestMemory;
 }
 
+export interface BlockedSpawnRequest extends SelectedSpawnRequest {
+  reason: string;
+}
+
 export interface SpawnQueueStatus {
   hasQueuedRequest: boolean;
   hasQueuedRequestWithIdleSpawn: boolean;
@@ -138,6 +142,33 @@ export function inspectSpawnQueueStatus(contexts: ColonyContext[], memory: Proje
   };
 }
 
+export function selectBlockedSpawnRequest(contexts: ColonyContext[], memory: ProjectMemoryShape): BlockedSpawnRequest | null {
+  const contextByRoomName = createContextByRoomName(contexts);
+  const candidates: BlockedSpawnRequest[] = [];
+
+  for (const colony of Object.values(memory.colonies)) {
+    const context = contextByRoomName.get(colony.roomName);
+
+    if (!context) {
+      continue;
+    }
+
+    const queue = Array.isArray(colony.spawnQueue) ? colony.spawnQueue : [];
+
+    for (const request of queue) {
+      const reason = getBlockedSpawnRequestReason(context, request, request.status);
+
+      if (reason !== null) {
+        candidates.push({ context, request, reason });
+      }
+    }
+  }
+
+  candidates.sort((left, right) => compareSelectedSpawnRequests(left, right, memory.config.colony.primaryRoomName));
+
+  return candidates[0] ?? null;
+}
+
 export function markSpawnRequestValidated(
   memory: ProjectMemoryShape,
   roomName: string,
@@ -168,7 +199,7 @@ export function markSpawnRequestWaiting(
   memory: ProjectMemoryShape,
   roomName: string,
   requestId: string,
-  code: ScreepsReturnCode,
+  code: ScreepsReturnCode | string,
   tick: number
 ): SpawnQueueResult {
   const request = findSpawnRequest(memory, roomName, requestId);
@@ -295,6 +326,32 @@ function isUsableSpawnCandidate(
   }
 
   return calculateBodyCost(request.body) <= context.energy.spawnCapacity;
+}
+
+function getBlockedSpawnRequestReason(
+  context: ColonyContext,
+  request: SpawnRequestMemory,
+  status: SpawnRequestMemory["status"]
+): string | null {
+  if (status !== "queued" && status !== "waiting") {
+    return null;
+  }
+
+  if (context.readiness !== "ready") {
+    const reasons = context.missingReasons.length > 0 ? context.missingReasons.join(",") : context.readiness;
+
+    return `colony not ready: ${reasons}`;
+  }
+
+  if (!hasIdleSpawn(context)) {
+    return "no idle spawn in colony";
+  }
+
+  if (calculateBodyCost(request.body) > context.energy.spawnCapacity) {
+    return "body cost exceeds spawn capacity";
+  }
+
+  return null;
 }
 
 function createContextByRoomName(contexts: ColonyContext[]): Map<string, ColonyContext> {

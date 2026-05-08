@@ -6,6 +6,7 @@ import {
   markSpawnRequestSpawning,
   markSpawnRequestValidated,
   markSpawnRequestWaiting,
+  selectBlockedSpawnRequest,
   selectNextSpawnRequestByStatus
 } from "spawning/queue";
 import { ColonyContext } from "colony/types";
@@ -59,6 +60,21 @@ function runQueuedValidation(
   const selected = selectNextSpawnRequestByStatus(contexts, memory, ["queued", "waiting"]);
 
   if (!selected) {
+    const blocked = selectBlockedSpawnRequest(contexts, memory);
+
+    if (blocked) {
+      // 不可选队列项也必须写入原因，否则真实 sim 会表现为 queued/null 的黑盒状态。
+      markSpawnRequestWaiting(memory, blocked.request.roomName, blocked.request.id, blocked.reason, tick);
+
+      return {
+        ok: false,
+        status: "waiting",
+        reason: blocked.reason,
+        roomName: blocked.context.roomName,
+        requestId: blocked.request.id
+      };
+    }
+
     const queueStatus = inspectSpawnQueueStatus(contexts, memory);
 
     if (queueStatus.hasQueuedRequest && !queueStatus.hasQueuedRequestWithIdleSpawn) {
