@@ -35,6 +35,19 @@ npm run test-integration
 - lint 失败：按 lint 定位修复源码或测试，不要用配置绕过。
 - integration 启动失败：见 `## 故障排查` 的集成服务器条目。
 
+## Verification Matrix 要求
+
+当一个阶段或 quick task 触碰 runtime、Memory schema、spawn lifecycle、命令输出、部署流程或 Screeps API 语义时，不要只写“测试通过”。应在计划、总结或验证文档中列出 Verification Matrix，把每个风险映射到证据层：
+
+| 证据层 | 用途 | 示例 |
+| ------ | ---- | ---- |
+| Unit | 锁定纯逻辑、迁移、状态机、命令格式 | `npm run test-unit -- --grep "spawn lifecycle"` |
+| Integration | 运行构建后的 `dist/main.js`，验证本地 mock-server 场景 | `npm run test-integration -- --grep "official-sim-style bootstrap"` |
+| Real sim UAT | 验证官方 sim 与 Customize 手工放置对象后的真实行为 | 按本手册“官方 sim UAT 清单”逐项检查 |
+| Command evidence | 用稳定 `cmd` token 和有界 Memory facts 作为人工证据 | `cmd.spawn.status()`、`cmd.spawn.queue()`、`cmd.sim.guidance()` |
+
+详细模板见 `docs/in-depth/verification-matrix.md`。
+
 ## 本地集成测试
 
 集成测试使用 `screeps-server-mockup@1.5.1`，并通过项目脚本固定当前可用路径：
@@ -80,6 +93,24 @@ npm run push-sim
 - 官方 sim 的初始世界可能缺少 source、spawn 或初始 creep；mock 场景会显式构造 ready/degraded 条件。
 - 官方 sim 的房间对象和 UI setup 依赖人工操作，runtime 只能记录 guidance，不能创建缺失对象。
 - 官方 sim 的 tick、CPU 和控制台输出节奏可能不同；判断时以稳定 `cmd` token 和 `Memory` 状态为准，不以完整日志快照为准。
+
+### 官方 sim UAT 清单
+
+这份清单用于 runtime-affecting 阶段，尤其是 spawn lifecycle、bootstrap、Memory migration 或 sim guidance 变更。每次执行前先完成本地 `npm run build`、`npm run lint`、`npm test` 和 `npm run test-integration`。
+
+| 步骤 | 操作 | 期望证据 |
+| ---- | ---- | -------- |
+| 1 | `npm run push-sim` 上传当前 bundle | Screeps sim 控制台加载的是当前版本，`cmd.help()` 可用 |
+| 2 | 在空/缺对象 sim 中运行 `cmd.sim.guidance()` | 缺 source/spawn/controller 时出现对应 `missing-*`，runtime 不尝试创建这些对象 |
+| 3 | 通过官方 sim Customize 放置 source、owned spawn 和 controller | `cmd.sim.guidance()` 中已解决的 missing code 消失或变为 inactive；旧 guidance flag 被清理 |
+| 4 | 运行 `cmd.colony.status()` 和 `cmd.colony.detail("W1N1")` | ready 房间显示 controller/source/spawn facts；degraded 房间显示可解释 missing reasons |
+| 5 | 让 spawn 能量不足或等待恢复 | `cmd.spawn.status()` / `cmd.spawn.queue()` 显示 `waiting` 和 `lastError=-6`，不会长期停在 `queued + lastError=-6` |
+| 6 | 恢复 spawn 能量并继续 tick | 请求应进入 `validated`、`spawning`，最终在 creep 完成后进入 `spawned` |
+| 7 | 观察 visible creep still spawning 的窗口 | 如果 Screeps 已能看到 creep 但 `creep.spawning === true`，请求应保持 `spawning`，不要提前标记 `spawned` |
+| 8 | 删除/等待 bootstrap creep 死亡后继续 tick | 当前可见人口低于目标时，应重新出现同一稳定 slot 的 queued spawn demand |
+| 9 | 记录证据 | 保存命令输出 token、tick 范围、异常状态和本地 verification matrix 行；不要粘贴 secrets 或完整 unbounded Memory |
+
+当前 `cmd.spawn.status()` / `cmd.spawn.queue()` 已能提供状态计数、队列条目和 `lastError`。后续可增强为更完整的 UAT 诊断视图，例如展示最近一次状态转换、`spawnName`、`creepName`、`completedTick` 和稳定 request id 匹配说明；本次硬化只记录该后续方向，不修改命令输出。
 
 ## 普通房间/私服启动检查
 
