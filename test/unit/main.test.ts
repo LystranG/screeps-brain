@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
+import { createDefaultProjectMemorySections } from "memory/schema";
 import { loop } from "../../src/main";
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
@@ -40,6 +41,7 @@ describe("main", () => {
     const memory = mockMemory();
     const game = mockGame();
     game.shard.name = "shard0";
+    Object.assign(memory, createDefaultProjectMemorySections());
     memory.creeps.persistValue = "any value";
     memory.creeps.notPersistValue = "any value";
     game.creeps.persistValue = "any value";

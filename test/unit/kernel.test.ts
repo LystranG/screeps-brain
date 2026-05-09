@@ -84,26 +84,18 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.isTrue(KERNEL_LIFECYCLE_STAGES.every(stage => typeof stage.run === "function"));
   });
 
-  it("blocks later stages when migration fails", () => {
+  it("does not block later stages for future memory versions during pre-live development", () => {
     mockMemory().version = 999;
     const result = new Kernel().run();
 
-    assert.isFalse(result.ok);
-    assert.deepEqual(result.executedStages, ["migrate"]);
-    assert.deepEqual(result.failures, [
-      {
-        stage: "migrate",
-        message: `Unsupported Memory.version 999; current version is ${CURRENT_MEMORY_VERSION}`
-      }
-    ]);
-    const failedMemory = (global as unknown as { Memory: Memory }).Memory;
-    assert.strictEqual(
-      failedMemory.runtime.migrationError,
-      `Unsupported Memory.version 999; current version is ${CURRENT_MEMORY_VERSION}`
-    );
+    assert.isTrue(result.ok);
+    assert.deepEqual(result.executedStages, [...KERNEL_STAGE_ORDER]);
+    assert.deepEqual(result.failures, []);
+    assert.equal(mockMemory().version, CURRENT_MEMORY_VERSION);
+    assert.isNull(mockMemory().runtime.migrationError);
   });
 
-  it("repairs partial current-version memory before creating services", () => {
+  it("resets partial current-version memory before creating services", () => {
     const memory = mockMemory();
     const game = mockGame();
     const defaults = createDefaultProjectMemorySections();
@@ -123,6 +115,7 @@ describe("kernel|stats cleanup|kernel runtime kernel", () => {
     assert.equal(memory.config.observability.logLevel, "info");
     assert.equal(memory.runtime.environment.type, RuntimeEnvironment.world);
     assert.equal(memory.stats.ticks, game.time);
+    assert.isFalse(memory.config.automation.enabled);
   });
 
   it("continues after non-migration stage failure", () => {
