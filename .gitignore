@@ -21,6 +21,9 @@ screeps.json
 # ScreepsServer data from integration tests
 /server
 
+# Private docs
+priv-docs
+
 # Numerous always-ignore extensions
 *.diff
 *.err
