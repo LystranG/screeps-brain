@@ -23,6 +23,10 @@ export interface KernelOptions {
   stages?: LifecycleStageOverrides;
 }
 
+/**
+ * Tick 内核：按固定生命周期顺序执行各阶段，单阶段失败不阻断后续阶段。
+ * 测试可通过 stages override 替换任意阶段 runner。
+ */
 export class Kernel {
   private readonly stages: LifecycleStageOverrides;
   private services: RuntimeServices | null = null;
@@ -31,9 +35,6 @@ export class Kernel {
     this.stages = options.stages || {};
   }
 
-  /**
-   * 按固定生命周期执行一个 tick；迁移失败会阻断后续阶段，其他阶段失败会记录后继续。
-   */
   public run(): KernelRunResult {
     const result: KernelRunResult = {
       ok: true,
@@ -70,11 +71,6 @@ export class Kernel {
           message: error instanceof Error ? error.message : "Unknown kernel stage failure"
         });
 
-        // Memory schema 不可信时不能继续执行后续系统，避免把坏状态扩散到本 tick。
-        if (stage.name === "migrate") {
-          return result;
-        }
-
         console.log(`Kernel stage ${stage.name} failed: ${result.failures[result.failures.length - 1].message}`);
       }
     }
@@ -82,7 +78,6 @@ export class Kernel {
     return result;
   }
 
-  // 测试可以覆盖任意阶段，生产路径则回落到默认阶段 runner。
   private createLifecycleStages(): LifecycleStage[] {
     return KERNEL_LIFECYCLE_STAGES.map(stage => ({
       name: stage.name,
@@ -91,7 +86,7 @@ export class Kernel {
   }
 
   private shouldProfileStage(stageName: LifecycleStageName): boolean {
-    return this.services !== null && stageName !== "migrate" && stageName !== "flushStats";
+    return this.services !== null && stageName !== "refreshServices";
   }
 
   private createLifecycleContext(): RuntimeLifecycleContext {

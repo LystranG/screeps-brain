@@ -1,15 +1,9 @@
+// 命令系统常量：API 版本、命令路径、状态前缀、副作用级别。
 export const COMMAND_API_VERSION = 1;
-export const COMMAND_HISTORY_LIMIT = 50;
 
 export const CommandPath = {
   help: "help",
-  env: "env",
-  sim: "sim",
-  colony: "colony",
-  strategy: "strategy",
-  config: "config",
-  spawn: "spawn",
-  debug: "debug"
+  sim: "sim"
 } as const;
 
 export type CommandPath = typeof CommandPath[keyof typeof CommandPath];

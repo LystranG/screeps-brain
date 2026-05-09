@@ -1,12 +1,10 @@
 import { assert } from "chai";
 import * as sinon from "sinon";
 import { Logger } from "logging/Logger";
-import { createDefaultProjectMemorySections } from "memory/schema";
 import { Profiler } from "profiling/Profiler";
 import { createScreepsProfilerAdapter } from "profiling/ScreepsProfilerAdapter";
-import { flushRuntimeStats } from "stats/Stats";
 
-describe("environment|sim bootstrap|observability logger|profiler|stats|observability logger", () => {
+describe("observability|logger", () => {
   let consoleLog: sinon.SinonStub | null = null;
 
   afterEach(() => {
@@ -20,20 +18,20 @@ describe("environment|sim bootstrap|observability logger|profiler|stats|observab
     consoleLog = sinon.stub(console, "log");
     const logger = new Logger({}, () => 10);
 
-    logger.info("kernel:migrate", "migration ok");
+    logger.info("kernel:environment", "env ok");
     logger.warn("kernel:cleanup", "cleanup slow");
-    logger.error("stats", "flush failed");
+    logger.error("sim:bootstrap", "flush failed");
 
-    assert.isTrue(consoleLog.calledWith("[info] kernel:migrate: migration ok"));
+    assert.isTrue(consoleLog.calledWith("[info] kernel:environment: env ok"));
     assert.isTrue(consoleLog.calledWith("[warn] kernel:cleanup: cleanup slow"));
-    assert.isTrue(consoleLog.calledWith("[error] stats: flush failed"));
+    assert.isTrue(consoleLog.calledWith("[error] sim:bootstrap: flush failed"));
   });
 
   it("filters debug output at the default info level", () => {
     consoleLog = sinon.stub(console, "log");
     const logger = new Logger({}, () => 10);
 
-    logger.debug("kernel:migrate", "debug details");
+    logger.debug("kernel:environment", "debug details");
 
     assert.isFalse(consoleLog.called);
   });
@@ -44,121 +42,48 @@ describe("environment|sim bootstrap|observability logger|profiler|stats|observab
 
     logger.warn("kernel:cleanup", "cleanup warning");
     logger.error("kernel:cleanup", "cleanup error");
-    logger.info("kernel:migrate", "migration ok");
+    logger.info("kernel:environment", "env ok");
 
     assert.isFalse(consoleLog.calledWithMatch("kernel:cleanup"));
-    assert.isTrue(consoleLog.calledOnceWith("[info] kernel:migrate: migration ok"));
+    assert.isTrue(consoleLog.calledOnceWith("[info] kernel:environment: env ok"));
   });
 
-  it("applies namespace sampling to info logs at ticks 10 and 11", () => {
+  it("applies namespace sampling to info logs", () => {
     consoleLog = sinon.stub(console, "log");
-    const loggerAtSampledTick = new Logger({ namespaceSampling: { stats: 5 } }, () => 10);
-    const loggerAtSkippedTick = new Logger({ namespaceSampling: { stats: 5 } }, () => 11);
+    const loggerAtSampledTick = new Logger({ namespaceSampling: { "sim:bootstrap": 5 } }, () => 10);
+    const loggerAtSkippedTick = new Logger({ namespaceSampling: { "sim:bootstrap": 5 } }, () => 11);
 
-    loggerAtSampledTick.info("stats", "rolling summary");
-    loggerAtSkippedTick.info("stats", "rolling summary");
-    loggerAtSampledTick.warn("stats", "warning bypasses namespace sampling");
+    loggerAtSampledTick.info("sim:bootstrap", "rolling summary");
+    loggerAtSkippedTick.info("sim:bootstrap", "rolling summary");
+    loggerAtSampledTick.warn("sim:bootstrap", "warning bypasses namespace sampling");
 
-    assert.isTrue(consoleLog.calledWith("[info] stats: rolling summary"));
-    assert.isTrue(consoleLog.calledWith("[warn] stats: warning bypasses namespace sampling"));
-    assert.equal(consoleLog.withArgs("[info] stats: rolling summary").callCount, 1);
-  });
-
-  it("treats invalid namespace sampling as unsampled", () => {
-    consoleLog = sinon.stub(console, "log");
-    const logger = new Logger({ namespaceSampling: { stats: Number.NaN, "sim:bootstrap": Number.POSITIVE_INFINITY } }, () => 11);
-
-    logger.info("stats", "nan sample rate");
-    logger.debug("sim:bootstrap", "debug remains level-filtered");
-    logger.info("sim:bootstrap", "infinite sample rate");
-
-    assert.isTrue(consoleLog.calledWith("[info] stats: nan sample rate"));
-    assert.isTrue(consoleLog.calledWith("[info] sim:bootstrap: infinite sample rate"));
-    assert.isFalse(consoleLog.calledWithMatch("debug remains level-filtered"));
+    assert.isTrue(consoleLog.calledWith("[info] sim:bootstrap: rolling summary"));
+    assert.isTrue(consoleLog.calledWith("[warn] sim:bootstrap: warning bypasses namespace sampling"));
+    assert.equal(consoleLog.withArgs("[info] sim:bootstrap: rolling summary").callCount, 1);
   });
 });
 
-describe("profiler|stats|kernel observability services", () => {
+describe("observability|profiler", () => {
   it("records profiler stage deltas from CPU values", () => {
     const cpuValues = [1, 3, 6];
     const profiler = new Profiler({
       getUsed: () => {
         const nextValue = cpuValues.shift();
-
         return nextValue === undefined ? 6 : nextValue;
       }
     });
 
-    profiler.startStage("migrate");
-    assert.deepEqual(profiler.endStage("migrate"), { stage: "migrate", duration: 2 });
+    profiler.startStage("installCommands");
+    assert.deepEqual(profiler.endStage("installCommands"), { stage: "installCommands", duration: 2 });
     assert.deepEqual(profiler.endStage("cleanup"), { stage: "cleanup", duration: 0 });
     assert.deepEqual(profiler.getSamples(), [
-      { stage: "migrate", duration: 2 },
+      { stage: "installCommands", duration: 2 },
       { stage: "cleanup", duration: 0 }
     ]);
   });
-
-  it("updates rolling stats summaries", () => {
-    const memory = createMemoryWithDefaults();
-
-    flushRuntimeStats(
-      memory,
-      [
-        { stage: "migrate", duration: 2 },
-        { stage: "cleanup", duration: 5 }
-      ],
-      true,
-      10
-    );
-    flushRuntimeStats(memory, [{ stage: "migrate", duration: 4 }], true, 11);
-
-    assert.equal(memory.stats.ticks, 11);
-    assert.isTrue(memory.stats.cpu.available);
-    assert.deepEqual(memory.stats.cpu.stages.migrate, {
-      last: 4,
-      average: 3,
-      max: 4,
-      samples: 2
-    });
-    assert.deepEqual(memory.stats.cpu.stages.cleanup, {
-      last: 5,
-      average: 5,
-      max: 5,
-      samples: 1
-    });
-  });
-
-  it("keeps sim CPU stats structurally present when available === false", () => {
-    const memory = createMemoryWithDefaults();
-
-    flushRuntimeStats(
-      memory,
-      [
-        { stage: "migrate", duration: 0 },
-        { stage: "cleanup", duration: 0 }
-      ],
-      false,
-      12
-    );
-
-    assert.equal(memory.stats.ticks, 12);
-    assert.isFalse(memory.stats.cpu.available);
-    assert.deepEqual(memory.stats.cpu.stages.migrate, {
-      last: 0,
-      average: 0,
-      max: 0,
-      samples: 1
-    });
-    assert.deepEqual(memory.stats.cpu.stages.cleanup, {
-      last: 0,
-      average: 0,
-      max: 0,
-      samples: 1
-    });
-  });
 });
 
-describe("screeps-profiler|deep profiler|observability adapter", () => {
+describe("observability|deep profiler adapter", () => {
   it("returns the same function when deep profiler is disabled", () => {
     const adapter = createScreepsProfilerAdapter(false);
     const loop = () => "ok";
@@ -177,14 +102,3 @@ describe("screeps-profiler|deep profiler|observability adapter", () => {
     assert.isFalse(adapter.enabled);
   });
 });
-
-function createMemoryWithDefaults(): Memory {
-  return {
-    ...createDefaultProjectMemorySections(),
-    creeps: {},
-    flags: {},
-    powerCreeps: {},
-    rooms: {},
-    spawns: {}
-  };
-}

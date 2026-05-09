@@ -4,6 +4,7 @@ import { Profiler } from "profiling/Profiler";
 import { RuntimeEnvironmentMetadata } from "environment/detection";
 import { ShardName } from "constants/runtime";
 
+// 每 tick 创建的运行时服务包，避免业务模块直接读取 Memory 或 Screeps 全局。
 export interface RuntimeServices {
   logger: Logger;
   profiler: Profiler;
@@ -12,10 +13,11 @@ export interface RuntimeServices {
 }
 
 /**
- * 每 tick 创建一次 runtime services，避免普通模块直接读取 Memory 或 Screeps profiler 细节。
+ * 从已初始化的 Memory 和当前 Game 构建本 tick 的服务实例。
+ * sim 环境下 CPU 标记为不可用（Game.cpu.getUsed() 在 sim 返回 0）。
  */
 export function createRuntimeServices(memory: Memory, game: Game): RuntimeServices {
-  const observabilityConfig = memory.config.observability;
+  const observabilityConfig = memory.config?.observability;
 
   return {
     logger: new Logger(createLoggerConfig(observabilityConfig), () => game.time),
@@ -25,7 +27,11 @@ export function createRuntimeServices(memory: Memory, game: Game): RuntimeServic
   };
 }
 
-function createLoggerConfig(config: ObservabilityConfigMemory): LoggerConfig {
+function createLoggerConfig(config?: ObservabilityConfigMemory): LoggerConfig {
+  if (!config) {
+    return {};
+  }
+
   const enabledNamespaces: LoggerConfig["enabledNamespaces"] = {};
 
   Object.keys(config.enabledNamespaces).forEach(namespace => {

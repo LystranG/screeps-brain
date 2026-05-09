@@ -1,3 +1,4 @@
+// Screeps 运行时常量：shard 分类、环境类型、日志级别、logger 命名空间。
 export const ShardName = {
   sim: "sim",
   shard0: "shard0",
@@ -29,21 +30,9 @@ export const LogLevel = {
 export type LogLevel = typeof LogLevel[keyof typeof LogLevel];
 
 export const LoggerNamespace = {
-  kernelMigrate: "kernel:migrate",
-  kernelRefreshServices: "kernel:refreshServices",
   kernelEnvironment: "kernel:environment",
-  kernelColonies: "kernel:colonies",
-  kernelSpawning: "kernel:spawning",
   kernelCleanup: "kernel:cleanup",
-  stats: "stats",
   simBootstrap: "sim:bootstrap"
 } as const;
 
 export type LoggerNamespace = typeof LoggerNamespace[keyof typeof LoggerNamespace];
-
-export const CpuAvailability = {
-  available: "available",
-  unavailable: "unavailable"
-} as const;
-
-export type CpuAvailability = typeof CpuAvailability[keyof typeof CpuAvailability];

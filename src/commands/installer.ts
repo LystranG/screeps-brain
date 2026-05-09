@@ -1,3 +1,4 @@
+// 安装版本化的 Screeps 控制台命令入口 global.cmd；同版本复用，避免每 tick 重建。
 import { CommandRegistry, ConsoleCommandNamespace, ConsoleCommandTree } from "commands/types";
 import { formatCommandResult, renderNamespaceHelp, renderRootHelp } from "commands/formatter";
 import { COMMAND_API_VERSION } from "constants/commands";
@@ -6,7 +7,6 @@ import { createDefaultCommandRegistry } from "commands/registry";
 export {};
 
 declare global {
-  // Screeps 会复用同一个 global VM；公开命令必须通过版本号替换旧闭包。
   const cmd: ConsoleCommandTree | undefined;
 }
 
@@ -17,13 +17,9 @@ interface CommandGlobalState {
 
 const commandApiVersionKey = "__cmdApiVersion";
 
-/**
- * 安装 Screeps 控制台入口；同版本直接复用，避免每 tick 重建命令树。
- */
 export function installConsoleCommands(): void {
   const globalState = global as unknown as CommandGlobalState;
 
-  // 字段名固定为计划约定的 __cmdApiVersion，使用索引访问避免 lint 误判为私有成员。
   if (globalState.cmd !== undefined && globalState[commandApiVersionKey] === COMMAND_API_VERSION) {
     return;
   }
@@ -35,23 +31,7 @@ export function installConsoleCommands(): void {
 function createConsoleCommandTree(registry: CommandRegistry): ConsoleCommandTree {
   return {
     help: () => renderRootHelp(registry.listNamespaces()),
-    env: createNamespaceCommandTree(registry, "env", ["status"]),
-    sim: createNamespaceCommandTree(registry, "sim", ["status", "guidance"]),
-    config: createNamespaceCommandTree(registry, "config", [
-      "logLevel",
-      "profiler",
-      "namespaceSampling",
-      "namespaceEnabled",
-      "construction",
-      "defense",
-      "deepProfiler",
-      "allowExpansion",
-      "allowRemoteMining"
-    ]),
-    debug: createNamespaceCommandTree(registry, "debug", ["stats", "observability", "dump"]),
-    colony: createNamespaceCommandTree(registry, "colony", ["status", "list", "detail"]),
-    strategy: createNamespaceCommandTree(registry, "strategy", ["status", "plan", "explain"]),
-    spawn: createNamespaceCommandTree(registry, "spawn", ["status", "queue", "dryRun"])
+    sim: createNamespaceCommandTree(registry, "sim", ["status", "guidance"])
   };
 }
 

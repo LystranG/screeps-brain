@@ -1,3 +1,4 @@
+import "memory/schema";
 import { RuntimeEnvironment, ShardName } from "constants/runtime";
 
 export interface RuntimeEnvironmentMetadata {

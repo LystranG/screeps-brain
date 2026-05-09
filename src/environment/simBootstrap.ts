@@ -1,3 +1,4 @@
+import "memory/schema";
 import { LoggerNamespace, RuntimeEnvironment } from "constants/runtime";
 import { Logger } from "logging/Logger";
 import { detectRuntimeEnvironment } from "environment/detection";

@@ -1,5 +1,4 @@
 import { assert } from "chai";
-import * as sinon from "sinon";
 import { renderRootHelp } from "commands/formatter";
 import { installConsoleCommands } from "commands/installer";
 import { createDefaultCommandRegistry } from "commands/registry";
@@ -8,64 +7,19 @@ import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame } from "./mock";
 
 describe("command install|registry assembly", () => {
-  const expectedNamespaces = [
-    "env",
-    "sim",
-    "config",
-    "debug",
-    "colony",
-    "strategy",
-    "spawn"
-  ];
-
-  function createCommandMemory(): Memory {
-    return {
-      ...createDefaultProjectMemorySections(),
-      creeps: {}
-    } as Memory;
-  }
-
-  function createContext(memory: Memory) {
-    return {
-      game: createMockGame() as unknown as Game,
-      memory
-    };
-  }
-
-  it("assembles every real and future command namespace", () => {
+  it("assembles the sim command namespace", () => {
     const registry = createDefaultCommandRegistry();
     const namespaces = registry.listNamespaces().map((namespace: CommandNamespaceDefinition) => namespace.name);
 
-    assert.deepEqual(namespaces, expectedNamespaces);
+    assert.deepEqual(namespaces, ["sim"]);
   });
 
-  it("renders root help with active strategy inspection commands", () => {
+  it("renders root help with sim namespace", () => {
     const registry = createDefaultCommandRegistry();
     const help = renderRootHelp(registry.listNamespaces());
 
-    assert.include(help, "cmd.env.help()");
     assert.include(help, "cmd.sim.help()");
-    assert.include(help, "cmd.config.help()");
-    assert.include(help, "cmd.debug.help()");
-    assert.include(help, "cmd.colony.help()");
-    assert.include(help, "cmd.strategy.help()");
-    assert.include(help, "cmd.spawn.help()");
-    assert.notInclude(help, "requires strategy planning phase");
-    assert.include(help, "Read-only colony context inspection commands");
-    assert.include(help, "Read-only strategy planning inspection commands");
-    assert.include(help, "Read-only spawn queue and dry-run inspection commands");
-  });
-
-  it("executes representative handlers from implemented namespaces", () => {
-    const memory = createCommandMemory();
-    const registry = createDefaultCommandRegistry();
-    const context = createContext(memory);
-
-    assert.equal(registry.execute(["env", "status"], [], context).status, "OK");
-    assert.equal(registry.execute(["config", "logLevel"], ["debug"], context).status, "OK");
-    assert.equal(registry.execute(["strategy", "status"], [], context).status, "OK");
-    assert.equal(registry.execute(["spawn", "status"], [], context).status, "OK");
-    assert.equal(memory.config.observability.logLevel, "debug");
+    assert.include(help, "Simulation bootstrap inspection commands");
   });
 });
 
@@ -73,33 +27,9 @@ describe("command install|global cmd", () => {
   interface TestCommandGlobalState {
     cmd?: {
       help(): string;
-      env: {
-        help(): string;
-        status(): string;
-      };
       sim: {
         help(): string;
         guidance(): string;
-        status(): string;
-      };
-      config: {
-        help(): string;
-        logLevel(level: string): string;
-      };
-      debug: {
-        help(): string;
-        dump(path: string, maxLength?: number): string;
-      };
-      strategy: {
-        explain(room?: string): string;
-        help(): string;
-        plan(room?: string): string;
-        status(): string;
-      };
-      spawn: {
-        help(): string;
-        dryRun(room?: string, role?: string, energy?: number): string;
-        queue(): string;
         status(): string;
       };
     };
@@ -114,8 +44,6 @@ describe("command install|global cmd", () => {
     return currentCmd as NonNullable<TestCommandGlobalState["cmd"]>;
   }
 
-  let consoleLog: sinon.SinonStub | null = null;
-
   beforeEach(() => {
     // @ts-ignore : allow adding Game to global
     global.Game = createMockGame();
@@ -129,11 +57,6 @@ describe("command install|global cmd", () => {
   });
 
   afterEach(() => {
-    if (consoleLog) {
-      consoleLog.restore();
-      consoleLog = null;
-    }
-
     delete (global as unknown as TestCommandGlobalState).cmd;
     delete (global as unknown as TestCommandGlobalState).__cmdApiVersion;
   });
@@ -143,20 +66,9 @@ describe("command install|global cmd", () => {
     const cmd = installedCmd();
 
     assert.isString(cmd.help());
-    assert.isString(cmd.env.status());
+    assert.isString(cmd.sim.status());
     assert.isString(cmd.sim.guidance());
-    assert.isString(cmd.config.logLevel("debug"));
-    assert.isString(cmd.debug.dump("Memory.config", 200));
-    assert.isString(cmd.strategy.status());
-    assert.isString(cmd.strategy.plan());
-    assert.isString(cmd.strategy.explain());
-    assert.include(cmd.help(), "cmd.env.help()");
-    assert.include(cmd.env.status(), "\nOK\n");
-    assert.include(cmd.env.status(), "\nenv status:\n");
-    assert.include(cmd.config.logLevel("debug"), "\nlogLevel: debug -> debug\n");
-    assert.include(cmd.debug.dump("Memory.config", 200), "\ndebug dump Memory.config:\n");
-    assert.include(cmd.strategy.status(), "\nstrategy status:\n");
-    assert.include(cmd.spawn.status(), "\nspawn status:\n");
+    assert.include(cmd.help(), "cmd.sim.help()");
   });
 
   it("reuses same-version cmd and rebuilds stale version bindings", () => {
@@ -172,18 +84,5 @@ describe("command install|global cmd", () => {
 
     assert.notStrictEqual(globalState.cmd, firstCmd);
     assert.equal(globalState.__cmdApiVersion, 1);
-  });
-
-  it("does not console.log from ordinary public wrappers", () => {
-    consoleLog = sinon.stub(console, "log");
-
-    installConsoleCommands();
-    const cmd = installedCmd();
-
-    cmd.env.status();
-    cmd.config.logLevel("debug");
-    cmd.debug.dump("Memory.config", 200);
-
-    assert.isFalse(consoleLog.called);
   });
 });

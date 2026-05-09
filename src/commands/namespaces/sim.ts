@@ -1,3 +1,4 @@
+import "memory/schema";
 import { CommandEffect, CommandPath } from "constants/commands";
 import { CommandNamespaceDefinition, CommandResult } from "commands/types";
 

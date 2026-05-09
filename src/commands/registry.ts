@@ -1,14 +1,7 @@
+// 命令注册表：路由 namespace.command 路径到对应 handler，返回结构化结果。
 import { CommandContext, CommandNamespaceDefinition, CommandRegistry, CommandResult } from "commands/types";
 import { CommandEffect } from "constants/commands";
-import { createColonyNamespace } from "commands/namespaces/colony";
-import { createConfigNamespace } from "commands/namespaces/config";
-import { createDebugNamespace } from "commands/namespaces/debug";
-import { createEnvNamespace } from "commands/namespaces/env";
-import { createFutureNamespaces } from "commands/namespaces/future";
 import { createSimNamespace } from "commands/namespaces/sim";
-import { createSpawnNamespace } from "commands/namespaces/spawn";
-import { createStrategyNamespace } from "commands/namespaces/strategy";
-import { recordCommandHistory } from "commands/history";
 
 function errorResult(message: string): CommandResult {
   return {
@@ -45,10 +38,7 @@ export function createCommandRegistry(namespaces: readonly CommandNamespaceDefin
         return errorResult(`Unknown command: ${namespaceName}.${commandName}`);
       }
 
-      const result = command.run(args, context);
-      recordCommandHistory(context.memory, context.game.time, path, args, result);
-
-      return result;
+      return command.run(args, context);
     },
 
     getNamespace(name: string): CommandNamespaceDefinition | undefined {
@@ -63,13 +53,6 @@ export function createCommandRegistry(namespaces: readonly CommandNamespaceDefin
 
 export function createDefaultCommandRegistry(): CommandRegistry {
   return createCommandRegistry([
-    createEnvNamespace(),
-    createSimNamespace(),
-    createConfigNamespace(),
-    createDebugNamespace(),
-    createColonyNamespace(),
-    createStrategyNamespace(),
-    ...createFutureNamespaces(),
-    createSpawnNamespace()
+    createSimNamespace()
   ]);
 }

@@ -58,87 +58,37 @@ for (const [constantName, constantValue] of Object.entries({
   (global as unknown as { [name: string]: unknown })[constantName] = constantValue;
 }
 
-// 每个测试都创建新对象，避免 shallow clone 共享嵌套 Memory/Game 状态。
 export function createMockGame(): {
   creeps: { [name: string]: any };
-  cpu: {
-    getUsed: () => number;
-    tickLimit: number;
-    bucket: number;
-  };
-  shard: {
-    name: string;
-  };
+  cpu: { getUsed: () => number; tickLimit: number; bucket: number };
+  shard: { name: string };
   rooms: { [roomName: string]: any };
   spawns: { [spawnName: string]: any };
   flags: { [flagName: string]: any };
   time: number;
-  getObjectById: (id: string) => any | null;
 } {
-  const game = {
+  return {
     creeps: {},
-    cpu: {
-      getUsed: () => 0,
-      tickLimit: 500,
-      bucket: 10000
-    },
-    shard: {
-      name: "sim"
-    },
+    cpu: { getUsed: () => 0, tickLimit: 500, bucket: 10000 },
+    shard: { name: "sim" },
     rooms: {},
     spawns: {},
     flags: {},
-    time: 12345,
-    getObjectById(id: string): any | null {
-      const currentGame = mockGame();
-      const directCollections = [currentGame.creeps, currentGame.spawns];
-
-      for (const collection of directCollections) {
-        const direct = collection[id];
-
-        if (direct !== undefined) {
-          return direct;
-        }
-      }
-
-      for (const room of Object.values(currentGame.rooms)) {
-        const roomValue = room as any;
-        const candidates = [
-          roomValue.controller,
-          ...(roomValue.find(FIND_SOURCES) ?? []),
-          ...(roomValue.find(FIND_MY_SPAWNS) ?? []),
-          ...(roomValue.find(FIND_MY_CREEPS) ?? [])
-        ];
-        const found = candidates.find(candidate => candidate?.id === id);
-
-        if (found !== undefined) {
-          return found;
-        }
-      }
-
-      return null;
-    }
+    time: 12345
   };
-
-  return game;
 }
 
-// Memory mock 只提供当前测试需要的最小结构，其余 section 由迁移测试补齐。
 export function createMockMemory(): {
   creeps: { [name: string]: any };
   [key: string]: any;
 } {
-  return {
-    creeps: {}
-  };
+  return { creeps: {} };
 }
 
-// 从 global 读取当前测试的 Game，避免测试误改导出的共享 fixture。
 export function mockGame(): ReturnType<typeof createMockGame> {
   return (global as unknown as { Game: ReturnType<typeof createMockGame> }).Game;
 }
 
-// 从 global 读取当前测试的 Memory，确保断言针对 runtime 实际使用的对象。
 export function mockMemory(): ReturnType<typeof createMockMemory> {
   return (global as unknown as { Memory: ReturnType<typeof createMockMemory> }).Memory;
 }
@@ -148,27 +98,17 @@ export interface MockRoomOptions {
   controller?: any;
   spawns?: any[];
   sources?: any[];
-  creeps?: any[];
-  constructionSites?: any[];
-  hostiles?: any[];
-  energyAvailable?: number;
-  energyCapacityAvailable?: number;
 }
 
 export function createMockRoom(options: MockRoomOptions): any {
   const findResults: { [findType: number]: any[] } = {
     [FIND_MY_SPAWNS]: options.spawns ?? [],
-    [FIND_SOURCES]: options.sources ?? [],
-    [FIND_MY_CREEPS]: options.creeps ?? [],
-    [FIND_MY_CONSTRUCTION_SITES]: options.constructionSites ?? [],
-    [FIND_HOSTILE_CREEPS]: options.hostiles ?? []
+    [FIND_SOURCES]: options.sources ?? []
   };
 
   return {
     name: options.name,
     controller: options.controller,
-    energyAvailable: options.energyAvailable ?? 0,
-    energyCapacityAvailable: options.energyCapacityAvailable ?? 0,
     find: (findType: number): any[] => findResults[findType] ?? []
   };
 }
