@@ -33,14 +33,21 @@ function createLoggerConfig(config?: ObservabilityConfigMemory): LoggerConfig {
   }
 
   const enabledNamespaces: LoggerConfig["enabledNamespaces"] = {};
+  // Start with top-level namespaceSampling, then override with per-namespace sampleRate
+  const namespaceSampling: { [namespace: string]: number } = { ...config.namespaceSampling };
 
   Object.keys(config.enabledNamespaces ?? {}).forEach(namespace => {
     enabledNamespaces[namespace] = config.enabledNamespaces[namespace]?.enabled;
+    const perNsSampleRate = config.enabledNamespaces[namespace]?.sampleRate;
+
+    if (perNsSampleRate !== undefined) {
+      namespaceSampling[namespace] = perNsSampleRate;
+    }
   });
 
   return {
     logLevel: config.logLevel,
     enabledNamespaces,
-    namespaceSampling: config.namespaceSampling
+    namespaceSampling
   };
 }
