@@ -115,9 +115,9 @@ export type { ITaskForceRegistry } from "./ITaskForceRegistry";
 export type { IIntelProvider } from "./IIntelProvider";
 export type { ICpuBudgetConfig } from "./ICpuBudgetConfig";
 
-// Phase 13+ 接口（占位，待填充）
-// export type { ITaskForce } from "./ITaskForce";
-// export type { IGarrison } from "./IGarrison";
+// Phase 13+ 接口（Phase 9 占位：类型存在但无具体方法定义）
+export type { ITaskForce } from "./ITaskForce";   // Phase 13 添加具体定义
+// export type { IGarrison } from "./IGarrison";  // Phase 12 添加
 ```
 
 **注意：** `ITaskForce` 接口在此处作为不透明类型引用被 `ITaskForceRegistry` 使用，其完整定义属于 Phase 13 TaskForce 详细设计的范围。Phase 9 只需要在类型系统中占位，无需定义具体方法。

@@ -160,7 +160,11 @@ public tick(services: RuntimeServices): void {
       (global as Record<string, unknown>)._lastTick = Game.time;
     } catch (error) {
       // Build 失败：保持 _needsBuildFlag = true，下一 tick 重试（D-17）
-      Game.notify(`HighCommand build failed at tick ${Game.time}: ${String(error)}`);
+      if (Game.shard !== undefined && Game.shard.name !== "sim") {
+        Game.notify(`HighCommand build failed at tick ${Game.time}: ${String(error)}`);
+      } else {
+        console.log(`[HighCommand] build failed at tick ${Game.time}: ${String(error)}`);
+      }
       return;
     }
   } else {
@@ -244,7 +248,7 @@ export type LifecycleStageName =
 // detectEnvironmentBootstrap 合并入 refreshServices（环境检测 + cpuBudget 计算）
 ```
 
-**`KERNEL_LIFECYCLE_STAGES` 追加第三个阶段：**
+**重构为 2 阶段工厂函数（删除 detectEnvironmentBootstrap，合并入 refreshServices）：**
 
 由于现有 `KERNEL_LIFECYCLE_STAGES` 是静态数组，Phase 9 实现时需要将其重构为工厂函数 `createLifecycleStages(highCommand: HighCommand): LifecycleStage[]`，使 `highCommandTick` 阶段能够通过闭包捕获 `highCommand` 实例：
 
@@ -372,9 +376,10 @@ export interface IIntelProvider {
 `src/shared/interfaces/index.ts` 扩展后的完整 barrel：
 
 ```typescript
-// 跨域接口契约的唯一导出口（barrel）。Phase 9 填充 ITaskForceRegistry、IIntelProvider。
+// 跨域接口契约的唯一导出口（barrel）。Phase 9 填充。
 export type { ITaskForceRegistry } from "./ITaskForceRegistry";
 export type { IIntelProvider } from "./IIntelProvider";
+export type { ICpuBudgetConfig } from "./ICpuBudgetConfig";
 export type { ITaskForce } from "./ITaskForce";   // Phase 13 添加具体定义
 ```
 

@@ -19,11 +19,12 @@
 
 ### 1.2 Phase 9 范围边界（D-11）
 
-**Phase 9 只定义以下三项内容：**
+**Phase 9 定义以下四项内容：**
 
 1. `CpuBudgetLevel` 数据结构（`src/shared/constants/cpu.ts`）
 2. `ICpuBudgetConfig` 阈值接口（`src/shared/interfaces/ICpuBudgetConfig.ts`）
-3. `computeBudgetLevel()` 方法签名与行为契约
+3. `computeBudgetLevel()` 纯函数完整实现（`src/runtime/services.ts`）
+4. `RuntimeServices` 类型演进（新增 `environment`、`cpuBudget` 字段）
 
 **以下内容不在 Phase 9 范围内，留给 Phase 11 Intel 调度器实现（D-11）：**
 
@@ -137,7 +138,7 @@ Phase 9 扩展 `RuntimeServices`，使其携带环境信息和 CPU 预算等级�
 ```typescript
 // src/runtime/services.ts
 
-import type { CpuBudgetLevel } from "shared/constants/cpu";
+import { CpuBudgetLevel } from "shared/constants/cpu";
 
 /**
  * 运行环境类型：由 createRuntimeServices() 在每 tick 开始时检测。
@@ -400,7 +401,7 @@ if (budgetLevel === CpuBudgetLevel.Critical) {
 
 | 规范 | 关联点 |
 |------|--------|
-| **KERN-01** | `computeBudgetLevel()` 在 `HighCommand.tick()` 中的调用位置；`CpuBudgetLevel` 的 import 来源 |
+| **KERN-01** | `services.cpuBudget` 在 `HighCommand.tick()` 中的使用位置；`CpuBudgetLevel` 的 import 来源 |
 | **KERN-03** | Init/Run 阶段的执行条件（`budgetLevel !== CpuBudgetLevel.Critical`）|
 | **SPEC-02** | `as const` 对象 + 派生联合类型模式（D-13）；中文 JSDoc 要求（D-11）|
 | **SPEC-04** | `shared/` 只读接口模式（模式 5）——`CpuBudgetLevel` 和 `ICpuBudgetConfig` 均为 shared 层内容；`IWatchdogConfig` 和 `WatchdogRecord` 为域私有类型（highCommand/ 层）|
