@@ -58,7 +58,7 @@ module.exports = {
     "eol-last": "off",
     eqeqeq: ["error", "smart"],
     "guard-for-in": "off",
-    "id-blacklist": ["error", "any", "Number", "number", "String", "string", "Boolean", "boolean", "Undefined"],
+    "id-denylist": ["error", "any", "Number", "number", "String", "string", "Boolean", "boolean", "Undefined"],
     "id-match": "error",
     "linebreak-style": "off",
     "max-classes-per-file": ["error", 1],
