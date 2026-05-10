@@ -130,11 +130,17 @@ export type { ICpuBudgetConfig } from "./ICpuBudgetConfig";
 
 ---
 
-## 4. computeBudgetLevel() 方法签名（D-08）
+## 4. computeBudgetLevel() 完整逻辑（D-08、D-11）
 
-### 4.1 方法签名与行为契约
+### 4.1 完整实现（Phase 9 定义，D-11 要求）
 
-以下签名来自 `HighCommand.ts`（见 KERN-01 § 方法签名摘要）。Phase 9 只建立方法契约，不提供实现体。
+以下为完整实现，可直接复制到 `src/highCommand/HighCommand.ts`（D-11：Phase 9 定义计算本 tick 预算等级的逻辑）。
+
+**HighCommand 中需新增配置字段：**
+```typescript
+/** CPU 预算阈值配置，默认使用 DEFAULT_CPU_BUDGET_CONFIG（Phase 11 可注入自定义配置）*/
+private readonly budgetConfig: ICpuBudgetConfig = DEFAULT_CPU_BUDGET_CONFIG;
+```
 
 ```typescript
 /**
@@ -144,10 +150,18 @@ export type { ICpuBudgetConfig } from "./ICpuBudgetConfig";
  * @returns 本 tick 适用的 CpuBudgetLevel
  */
 private computeBudgetLevel(services: RuntimeServices): CpuBudgetLevel {
-  // 实现：对照 ICpuBudgetConfig 阈值比较 Game.cpu.bucket
-  // 返回 CpuBudgetLevel.Critical / Low / Normal / Surplus
-  // 注意：bucket 是 Game.cpu.bucket（0-10000），不是 Game.cpu.getUsed()
-  throw new Error("computeBudgetLevel implementation in Phase 11");
+  const bucket = Game.cpu.bucket;
+
+  if (bucket < this.budgetConfig.criticalThreshold) {
+    return CpuBudgetLevel.Critical;   // bucket < 500：极低水位，仅执行最小集（D-10）
+  }
+  if (bucket < this.budgetConfig.lowThreshold) {
+    return CpuBudgetLevel.Low;        // bucket < 2500：偏低水位，截断低优先级 TF（D-07）
+  }
+  if (bucket > this.budgetConfig.surplusThreshold) {
+    return CpuBudgetLevel.Surplus;    // bucket > 8000：充足水位，可执行密集任务
+  }
+  return CpuBudgetLevel.Normal;       // bucket 2500–8000：正常水位，完整执行
 }
 ```
 
@@ -158,9 +172,9 @@ private computeBudgetLevel(services: RuntimeServices): CpuBudgetLevel {
 - 副作用：无——只读取 `Game.cpu.bucket`，不修改任何状态
 - 参数 `services` 仅用于记录异常水位日志（如 bucket 意外归零时通过 `services.logger` 发出警告）
 
-### 4.2 预期实现逻辑（Phase 11 参考）
+### 4.2 比较顺序说明
 
-Phase 11 实现时，应对照 `ICpuBudgetConfig` 阈值进行顺序比较：
+实现体按以下顺序对照 `ICpuBudgetConfig` 阈值进行顺序比较（短路求值，避免范围重叠歧义）：
 
 ```
 if bucket < criticalThreshold  → CpuBudgetLevel.Critical
@@ -178,7 +192,18 @@ else                           → CpuBudgetLevel.Normal
 | Low | 500–2500 | 截断低优先级 TaskForce（Phase 11 实现）|
 | Critical | < 500 | 最小集：refresh + spawn 基础设施（D-10）|
 
-### 4.4 在 tick() 中的调用点
+### 4.4 Screeps 环境差异说明
+
+> **Simulation 模式注意：** `Game.cpu.getUsed()` 在 Simulation 模式下**始终返回 0**，但 `Game.cpu.bucket` 是有效值（0–10000）。
+>
+> `computeBudgetLevel()` 只读取 `Game.cpu.bucket`，因此在 Simulation 模式下行为正确：
+>
+> - `Game.cpu.bucket` 在 sim 中有效，阈值比较正常运作
+> - `Game.cpu.getUsed()` 在 sim 中为 0，但本方法不读取 `getUsed()`
+>
+> **结论：** `computeBudgetLevel()` 无需针对 Simulation 做特殊处理。
+
+### 4.5 在 tick() 中的调用点
 
 `computeBudgetLevel()` 在 `HighCommand.tick()` 中的调用时序（见 KERN-01 §4）：
 
@@ -274,7 +299,7 @@ const sample = services.profiler.endStage(record.ref);
 | CpuBudgetLevel 数据结构 | CpuBudgetLevel as const | — |
 | ICpuBudgetConfig 阈值接口 | 接口定义 + 推荐值 | — |
 | DEFAULT_CPU_BUDGET_CONFIG | 默认配置常量 | — |
-| computeBudgetLevel() 方法签名 | 方法签名 + 行为契约 | 实现体 |
+| computeBudgetLevel() 完整实现 | 方法签名 + 完整逻辑（D-11） | — |
 | WatchdogRecord 数据结构 | 接口定义 | — |
 | IWatchdogConfig 配置接口 | 接口定义 + 推荐值 | — |
 | TaskForce 截断 for 循环 | — | Intel 调度器按优先级截断 |

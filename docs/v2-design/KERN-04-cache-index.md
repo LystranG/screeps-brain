@@ -42,11 +42,16 @@ export interface HighCommandCache {
   creepsByGarrison: Record<string, string[]>;
 }
 
-/** Cache 初始值（空索引，Build 阶段初始化，Refresh 阶段重建）*/
-export const EMPTY_CACHE: HighCommandCache = {
-  creepsByTaskForce: {},
-  creepsByGarrison: {}
-} as const;
+/**
+ * 空 Cache 工厂函数：每次调用返回新对象，防止共享引用被意外 mutate。
+ * 用于 Build 阶段初始化和 rebuildCache() 重置。
+ */
+export function createEmptyHighCommandCache(): HighCommandCache {
+  return {
+    creepsByTaskForce: {},
+    creepsByGarrison: {}
+  };
+}
 ```
 
 **数据结构选择说明（D-12 Open Question 3 解决）：** 使用 `Record<string, string[]>`（plain object）而非 `Map<string, string[]>`，原因：
@@ -77,7 +82,7 @@ private cache: HighCommandCache = { creepsByTaskForce: {}, creepsByGarrison: {} 
 ```typescript
 // src/shared/interfaces/ITaskForceRegistry.ts
 
-import type { ITaskForce } from "shared/interfaces";
+import type { ITaskForce } from "./ITaskForce";  // 相对路径，避免 barrel 自引用循环依赖
 
 /**
  * TaskForce 注册表接口：TaskForce 构造时通过此接口注册自身，不直接依赖 HighCommand。
@@ -189,7 +194,7 @@ private refresh(services: RuntimeServices): void {
  * @param ref - TaskForce 的唯一标识符
  * @returns Creep 名称列表（无对应 TF 时返回空数组）
  */
-public getCreepsByTaskForce(ref: string): string[] {
+public getCreepsByTaskForce(ref: string): readonly string[] {
   return this.cache.creepsByTaskForce[ref] ?? [];
 }
 
@@ -199,12 +204,12 @@ public getCreepsByTaskForce(ref: string): string[] {
  * @param garrisonName - Garrison 所在房间名
  * @returns Creep 名称列表（无对应 Garrison 时返回空数组）
  */
-public getCreepsByGarrison(garrisonName: string): string[] {
+public getCreepsByGarrison(garrisonName: string): readonly string[] {
   return this.cache.creepsByGarrison[garrisonName] ?? [];
 }
 ```
 
-**返回值类型说明：** 两个方法均返回 `string[]`（Creep 名称列表），不是 `Creep[]`。调用方用名称从 `Game.creeps[name]` 获取实际 Creep 对象。这避免了 Cache 中存储 Creep 对象引用（Creep 对象每 tick 重建，不应被长期持有）。
+**返回值类型说明：** 两个方法均返回 `readonly string[]`（Creep 名称列表），不是 `Creep[]`。调用方用名称从 `Game.creeps[name]` 获取实际 Creep 对象。这避免了 Cache 中存储 Creep 对象引用（Creep 对象每 tick 重建，不应被长期持有）。`readonly` 修饰符防止调用方通过 `.push()` / `.splice()` 意外修改 HighCommand 内部 Cache 数组。
 
 **为什么不提供反向查询（creep → TF）（D-14）：**
 
@@ -417,6 +422,36 @@ export type { HighCommandCache } from "./types";  // ❌ 暴露内部实现细�
 // src/highCommand/types.ts — 不在 index.ts 中 re-export
 // src/highCommand/index.ts — 只导出 HighCommand 类
 export { HighCommand } from "./HighCommand";
+```
+
+### 禁止 5：查询方法返回可变 string[]（MEDIUM-3）
+
+```typescript
+// ❌ 禁止：返回可变数组允许调用方 mutate 内部 Cache
+public getCreepsByTaskForce(ref: string): string[] {
+  return this.cache.creepsByTaskForce[ref] ?? [];
+}
+// 调用方可以 .push() / .splice() 污染 HighCommand 内部状态
+
+// ✅ 正确：readonly string[] 由 TypeScript 编译期强制不可变
+public getCreepsByTaskForce(ref: string): readonly string[] {
+  return this.cache.creepsByTaskForce[ref] ?? [];
+}
+// 调用方如需修改，必须显式复制：[...highCommand.getCreepsByTaskForce(ref)]
+```
+
+### 禁止 6：共享 EMPTY_CACHE 对象引用（LOW-1）
+
+```typescript
+// ❌ 禁止：共享引用可被意外 mutate
+export const EMPTY_CACHE: HighCommandCache = { creepsByTaskForce: {}, creepsByGarrison: {} } as const;
+// this.cache = EMPTY_CACHE → 若后续 this.cache.creepsByTaskForce["ref"] = [...] 会污染全局
+
+// ✅ 正确：工厂函数每次返回新对象实例
+export function createEmptyHighCommandCache(): HighCommandCache {
+  return { creepsByTaskForce: {}, creepsByGarrison: {} };
+}
+// this.cache = createEmptyHighCommandCache() → 安全，互不影响
 ```
 
 ---

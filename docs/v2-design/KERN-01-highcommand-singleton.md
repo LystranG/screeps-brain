@@ -56,10 +56,10 @@ src/
 
 ```typescript
 import type { IIntelProvider } from "shared/interfaces";
-import type { IGarrison } from "highCommand/garrison";
+import type { IGarrison } from "shared/interfaces";
 import type { ITaskForce, ITaskForceRegistry } from "shared/interfaces";
 import { EventBus } from "shared/events";
-import type { CpuBudgetLevel } from "shared/constants/cpu";
+import { CpuBudgetLevel } from "shared/constants/cpu";
 import type { RuntimeServices } from "runtime/services";
 
 /**
@@ -113,6 +113,21 @@ export class HighCommand implements ITaskForceRegistry {
 }
 ```
 
+**全局类型声明（`src/shared/types/global.d.ts`）：**
+
+```typescript
+// src/shared/types/global.d.ts — 追加以下声明
+declare global {
+  /**
+   * HighCommand 用于检测 global reset 的上一 tick 记录（D-06）。
+   * 存放在 global（而非 HighCommand 实例字段）的原因：
+   * HighCommand 实例在 global reset 后可能被 Kernel 重建，
+   * 但 global 对象在同一 JS 进程内持续存在。
+   */
+  var _lastTick: number | undefined;
+}
+```
+
 **字段类型说明（SPEC-04 模式 2）：**
 
 | 字段 | 类型 | 原因 |
@@ -163,6 +178,20 @@ public tick(services: RuntimeServices): void {
   }
 }
 ```
+
+> **Screeps 环境差异说明：** `Game.notify()` 在 Simulation 模式下**静默失效**（不发邮件、不报错）。
+> 如需在 Simulation 中仍能观察到通知，应使用如下 sim-safe 封装：
+>
+> ```typescript
+> if (Game.shard !== undefined && Game.shard.name !== "sim") {
+>   Game.notify(`HighCommand build failed at tick ${Game.time}: ${String(error)}`);
+> } else {
+>   console.log(`[HighCommand] build failed at tick ${Game.time}: ${String(error)}`);
+> }
+> ```
+>
+> **注意：** `Game.cpu.bucket` 在 Simulation 中是有效值（0–10000），`Game.cpu.getUsed()` 亦有效。
+> 但 `Game.shard` 在 Simulation 中为 `undefined`（私服）或 `{ name: "sim" }`（官服 sim 房间）。
 
 **关键设计约束（D-06、D-17）：**
 
@@ -284,8 +313,8 @@ private createLifecycleStages(): LifecycleStage[] {
 | `tick(services: RuntimeServices): void` | public | 本 tick 入口，自治判断 build/refresh |
 | `register(ref: string, taskForce: ITaskForce): void` | public | ITaskForceRegistry 实现，Build 阶段注册 TF |
 | `unregister(ref: string): void` | public | ITaskForceRegistry 实现，注销 TF |
-| `getCreepsByTaskForce(ref: string): string[]` | public | Cache 查询接口（见 KERN-04）|
-| `getCreepsByGarrison(garrisonName: string): string[]` | public | Cache 查询接口（见 KERN-04）|
+| `getCreepsByTaskForce(ref: string): readonly string[]` | public | Cache 查询接口（见 KERN-04）；返回 readonly 防止调用方修改内部 Cache 数组 |
+| `getCreepsByGarrison(garrisonName: string): readonly string[]` | public | Cache 查询接口（见 KERN-04）；返回 readonly 防止调用方修改内部 Cache 数组 |
 | `build(services: RuntimeServices): void` | private | 完整构造对象树（Intel、Garrison、注册 EventBus 处理器）|
 | `refresh(services: RuntimeServices): void` | private | 最小刷新 + Cache 重建（见 KERN-03、KERN-04）|
 | `init(services: RuntimeServices): void` | private | 驱动 Intel.init() → TaskForce.init() → Garrison.init() |
@@ -452,6 +481,28 @@ if (needsBuild) {
     return;  // 直接返回，不执行 init/run
   }
 }
+```
+
+### 禁止 6：CpuBudgetLevel 使用 import type（HIGH-1）
+
+```typescript
+// ❌ 禁止：CpuBudgetLevel 用作运行时值比较时不得使用 import type
+import type { CpuBudgetLevel } from "shared/constants/cpu";
+// 运行时：budgetLevel === CpuBudgetLevel.Critical → 编译错误（type-only import 被 erasure）
+
+// ✅ 正确：值导入，保留运行时可访问性
+import { CpuBudgetLevel } from "shared/constants/cpu";
+// budgetLevel === CpuBudgetLevel.Critical → 正确的运行时字符串比较
+```
+
+### 禁止 7：IGarrison 从实现模块 barrel 导入（MEDIUM-1、SPEC-03）
+
+```typescript
+// ❌ 禁止：从实现模块导入跨域接口
+import type { IGarrison } from "highCommand/garrison";  // 违反 SPEC-03 依赖方向规则
+
+// ✅ 正确：跨域接口统一从 shared/interfaces 导入
+import type { IGarrison } from "shared/interfaces";  // 跨域接口的唯一来源
 ```
 
 ---

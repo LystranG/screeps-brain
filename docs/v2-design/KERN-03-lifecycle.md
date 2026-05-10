@@ -124,10 +124,27 @@ export function createLifecycleStages(highCommand: HighCommand): LifecycleStage[
   ];
 }
 
-// 保持向后兼容的 KERNEL_STAGE_ORDER（从 LifecycleStageName 类型派生，无需改动）
+// KERNEL_STAGE_ORDER 必须为显式静态数组（工厂函数重构后无法从 .map() 派生）
 ```
 
-**重要说明：** 此次重构将导出从 `KERNEL_LIFECYCLE_STAGES`（数组常量）改为 `createLifecycleStages()`（工厂函数）。Kernel.ts 必须更新调用方式，传入 `this.highCommand`。`KERNEL_STAGE_ORDER` 的派生方式不变（从类型推导）。
+**重要说明：** 此次重构将导出从 `KERNEL_LIFECYCLE_STAGES`（数组常量）改为 `createLifecycleStages()`（工厂函数）。Kernel.ts 必须更新调用方式，传入 `this.highCommand`。KERNEL_STAGE_ORDER 重新定义为显式静态数组（不再从 KERNEL_LIFECYCLE_STAGES.map() 派生）：
+
+```typescript
+/**
+ * 阶段执行顺序（显式静态数组）。
+ * 工厂函数 createLifecycleStages() 需要 HighCommand 实例参数，
+ * 无法在模块加载时调用，因此不能用 .map() 动态派生。
+ * TypeScript 的 LifecycleStageName union 确保拼写错误产生编译错误，
+ * 但顺序一致性需手动维护。
+ */
+export const KERNEL_STAGE_ORDER: LifecycleStageName[] = [
+  "refreshServices",
+  "detectEnvironmentBootstrap",
+  "highCommandTick"
+];
+```
+
+**维护注意：** 当 `createLifecycleStages()` 的返回数组顺序变化时，`KERNEL_STAGE_ORDER` 必须同步手动更新。
 
 ### 2.3 Kernel.ts 对应修改
 
@@ -184,7 +201,11 @@ public tick(services: RuntimeServices): void {
       (global as Record<string, unknown>)._lastTick = Game.time;
     } catch (error) {
       // ❌ Build 失败：不更新 _lastTick / _needsBuildFlag
-      Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+      if (Game.shard !== undefined && Game.shard.name !== "sim") {
+        Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+      } else {
+        console.log(`[HighCommand] build() 失败 at tick ${Game.time}: ${String(error)}`);
+      }
       return; // 直接返回，不执行 init/run，避免 null 引用级联崩溃
     }
   } else {
@@ -260,7 +281,11 @@ private init(services: RuntimeServices): void {
   try {
     this.intel?.init(services);
   } catch (error) {
-    Game.notify(`Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    if (Game.shard !== undefined && Game.shard.name !== "sim") {
+      Game.notify(`Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    } else {
+      console.log(`[HighCommand] Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    }
   }
 
   // Garrison init（各自隔离）
@@ -268,7 +293,11 @@ private init(services: RuntimeServices): void {
     try {
       garrison.init(services);
     } catch (error) {
-      Game.notify(`Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      if (Game.shard !== undefined && Game.shard.name !== "sim") {
+        Game.notify(`Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      } else {
+        console.log(`[HighCommand] Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      }
     }
   }
 }
@@ -300,7 +329,11 @@ private run(services: RuntimeServices): void {
   try {
     this.intel?.run(services);
   } catch (error) {
-    Game.notify(`Intel.run() 失败 at tick ${Game.time}: ${String(error)}`);
+    if (Game.shard !== undefined && Game.shard.name !== "sim") {
+      Game.notify(`Intel.run() 失败 at tick ${Game.time}: ${String(error)}`);
+    } else {
+      console.log(`[HighCommand] Intel.run() 失败 at tick ${Game.time}: ${String(error)}`);
+    }
   }
 
   // Garrison run（各自隔离）
@@ -308,7 +341,11 @@ private run(services: RuntimeServices): void {
     try {
       garrison.run(services);
     } catch (error) {
-      Game.notify(`Garrison[${roomName}].run() 失败 at tick ${Game.time}: ${String(error)}`);
+      if (Game.shard !== undefined && Game.shard.name !== "sim") {
+        Game.notify(`Garrison[${roomName}].run() 失败 at tick ${Game.time}: ${String(error)}`);
+      } else {
+        console.log(`[HighCommand] Garrison[${roomName}].run() 失败 at tick ${Game.time}: ${String(error)}`);
+      }
     }
   }
 }
@@ -342,7 +379,11 @@ if (needsBuild) {
     this._needsBuildFlag = false;
     (global as Record<string, unknown>)._lastTick = Game.time;
   } catch (error) {
-    Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+    if (Game.shard !== undefined && Game.shard.name !== "sim") {
+      Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+    } else {
+      console.log(`[HighCommand] build() 失败 at tick ${Game.time}: ${String(error)}`);
+    }
     return; // ← 关键：不执行 init/run，避免访问未初始化的对象引用
   }
 }
@@ -356,7 +397,11 @@ private init(services: RuntimeServices): void {
   try {
     this.intel?.init(services);
   } catch (error) {
-    Game.notify(`Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    if (Game.shard !== undefined && Game.shard.name !== "sim") {
+      Game.notify(`Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    } else {
+      console.log(`[HighCommand] Intel.init() 失败 at tick ${Game.time}: ${String(error)}`);
+    }
   }
 
   // Garrison init（各自隔离）
@@ -364,11 +409,37 @@ private init(services: RuntimeServices): void {
     try {
       garrison.init(services);
     } catch (error) {
-      Game.notify(`Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      if (Game.shard !== undefined && Game.shard.name !== "sim") {
+        Game.notify(`Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      } else {
+        console.log(`[HighCommand] Garrison[${roomName}].init() 失败 at tick ${Game.time}: ${String(error)}`);
+      }
     }
   }
 }
 ```
+
+---
+
+### 7.1 Screeps 环境差异说明
+
+> **Game.notify() 在 Simulation 模式下不可用。** 设计中的所有 `Game.notify()` 调用均需通过 sim-safe 包装：
+>
+> ```typescript
+> if (Game.shard !== undefined && Game.shard.name !== "sim") {
+>   Game.notify(`...`);
+> } else {
+>   console.log(`[HighCommand] ...`);
+> }
+> ```
+>
+> **判断依据：**
+> - 官服 Simulation 房间：`Game.shard.name === "sim"`
+> - 私服（无 shard 概念）：`Game.shard === undefined`
+> - 正式 shard（shard0/shard1/shard2/shard3）：`Game.shard.name !== "sim"` → 可安全调用 `Game.notify()`
+>
+> **Game.cpu.getUsed()** 在 Simulation 模式下始终返回 0，但 `Game.cpu.bucket` 是有效值。
+> `computeBudgetLevel()` 只读取 bucket，因此不受影响。
 
 ---
 
@@ -494,7 +565,11 @@ if (needsBuild) {
     this._needsBuildFlag = false;
     (global as Record<string, unknown>)._lastTick = Game.time;  // ✅ 成功后才更新
   } catch (error) {
-    Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+    if (Game.shard !== undefined && Game.shard.name !== "sim") {
+      Game.notify(`HighCommand.build() 失败 at tick ${Game.time}: ${String(error)}`);
+    } else {
+      console.log(`[HighCommand] build() 失败 at tick ${Game.time}: ${String(error)}`);
+    }
     return;
   }
 }
@@ -540,6 +615,21 @@ private init(services: RuntimeServices): void {
   }
   // 没有任何直接的 Game 对象修改
 }
+```
+
+### 禁止 6：从 KERNEL_LIFECYCLE_STAGES 动态派生 KERNEL_STAGE_ORDER
+
+```typescript
+// ❌ 禁止：工厂函数重构后，静态数组不再存在
+export const KERNEL_STAGE_ORDER = KERNEL_LIFECYCLE_STAGES.map(stage => stage.name);
+// createLifecycleStages() 需要 HighCommand 实例参数，模块加载时无法调用
+
+// ✅ 正确：显式静态数组，手动维护顺序一致性
+export const KERNEL_STAGE_ORDER: LifecycleStageName[] = [
+  "refreshServices",
+  "detectEnvironmentBootstrap",
+  "highCommandTick"
+];
 ```
 
 ---
