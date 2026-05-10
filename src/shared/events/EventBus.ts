@@ -31,4 +31,31 @@ export class EventBus {
       handler(payload);
     }
   }
+
+  /**
+   * 注销事件处理器。
+   * @param event - 事件名称
+   * @param handler - 要注销的处理函数
+   */
+  public off<T>(event: string, handler: EventHandler<T>): void {
+    const list = this.handlers.get(event) ?? [];
+    const index = list.indexOf(handler as EventHandler<unknown>);
+
+    if (index !== -1) {
+      list.splice(index, 1);
+      this.handlers.set(event, list);
+    }
+  }
+
+  /**
+   * 清除事件处理器。
+   * @param event - 事件名称（不传则清除所有事件的处理器）
+   */
+  public clear(event?: string): void {
+    if (event === undefined) {
+      this.handlers.clear();
+    } else {
+      this.handlers.delete(event);
+    }
+  }
 }
