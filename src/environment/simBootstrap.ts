@@ -185,12 +185,18 @@ function updateGuidance(
   });
 
   Object.keys(guidance).forEach(code => {
-    if (activeMessages[code] !== undefined || guidance[code].active !== true) {
-      return;
+    if (activeMessages[code] !== undefined) {
+      return; // still active, handled above
+    }
+
+    // Always keep lastSeenTick current even for already-inactive entries
+    guidance[code].lastSeenTick = tick;
+
+    if (guidance[code].active !== true) {
+      return; // already deactivated, no need to re-log
     }
 
     guidance[code].active = false;
-    guidance[code].lastSeenTick = tick;
     guidance[code].lastLoggedTick = tick;
     logger.info(LoggerNamespace.simBootstrap, `Resolved sim guidance: ${code}`);
     loggedCodes.push(code);
