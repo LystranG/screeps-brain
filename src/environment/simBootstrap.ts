@@ -217,7 +217,8 @@ function updateFlagGuidance(memory: Memory, game: Game, activeCodes: string[]): 
       return;
     }
 
-    const entry = memory.runtime.sim.guidance[code] as SimGuidanceEntryState;
+    const entry = (memory.runtime.sim.guidance[code] ?? {}) as SimGuidanceEntryState;
+    memory.runtime.sim.guidance[code] = entry; // ensure it is written back
     entry.flagName = flagName;
 
     if (entry.flagResult && entry.flagResult !== "unavailable") {
