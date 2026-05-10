@@ -250,6 +250,10 @@ export class IntegrationTestHelper {
   }
 
   public configureShardName(shardName: string): void {
+    if (!/^[A-Za-z0-9_\-]+$/.test(shardName)) {
+      throw new Error(`configureShardName: invalid shardName "${shardName}"`);
+    }
+
     const engineConfig = this._server.driver.config;
     const marker = `__lystranShardName_${this.scenario.name.replace(/[^A-Za-z0-9_]/g, "_")}`;
 
