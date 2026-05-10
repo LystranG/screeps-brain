@@ -1,5 +1,5 @@
 import "memory/schema";
-import { RuntimeEnvironment, ShardName } from "shared/constants/runtime";
+import { RuntimeEnvironment, ShardName } from "shared/constants";
 
 export interface RuntimeEnvironmentMetadata {
   type: RuntimeEnvironment;

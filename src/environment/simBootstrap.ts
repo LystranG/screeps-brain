@@ -1,5 +1,5 @@
 import "memory/schema";
-import { LoggerNamespace, RuntimeEnvironment } from "shared/constants/runtime";
+import { LoggerNamespace, RuntimeEnvironment } from "shared/constants";
 import { Logger } from "logging/Logger";
 import { detectRuntimeEnvironment } from "environment/detection";
 
