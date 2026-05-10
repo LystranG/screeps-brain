@@ -130,35 +130,99 @@ export type { ICpuBudgetConfig } from "./ICpuBudgetConfig";
 
 ---
 
+## 3.4 RuntimeServices 类型演进
+
+Phase 9 扩展 `RuntimeServices`，使其携带环境信息和 CPU 预算等级。HighCommand.tick() 通过 `services` 参数获取这些信息，无需自行计算。
+
+```typescript
+// src/runtime/services.ts
+
+import type { CpuBudgetLevel } from "shared/constants/cpu";
+
+/**
+ * 运行环境类型：由 createRuntimeServices() 在每 tick 开始时检测。
+ * - "world": 官服正式 shard（shard0–shard3）
+ * - "sim": 官服 Simulation 房间（Game.shard.name === "sim"）
+ * - "private": 私服（Game.shard === undefined）
+ */
+export type RuntimeEnvironment = "world" | "sim" | "private";
+
+/**
+ * 每 tick 运行时服务：由 Kernel 的 refreshServices 阶段创建，传入 HighCommand.tick()。
+ * 包含 logger、profiler、环境检测结果、CPU 预算等级。
+ */
+export interface RuntimeServices {
+  readonly logger: Logger;
+  readonly profiler: Profiler;
+  /** 当前运行环境（sim/world/private），每 tick 检测一次 */
+  readonly environment: RuntimeEnvironment;
+  /** 本 tick CPU 预算等级，基于 Game.cpu.bucket 计算 */
+  readonly cpuBudget: CpuBudgetLevel;
+}
+
+/**
+ * 创建本 tick 运行时服务（Kernel refreshServices 阶段调用）。
+ * 职责：logger/profiler 初始化 + 环境检测 + cpuBudget 计算。
+ */
+export function createRuntimeServices(memory: Memory, game: Game): RuntimeServices {
+  const logger = createLogger(memory);
+  const profiler = createProfiler(memory);
+  const environment = detectRuntimeEnvironment();
+  const cpuBudget = computeBudgetLevel();
+
+  return { logger, profiler, environment, cpuBudget };
+}
+
+/**
+ * 检测运行环境（几行代码，替代原 detectEnvironmentBootstrap 的 200+ 行 Flag guidance）。
+ */
+function detectRuntimeEnvironment(): RuntimeEnvironment {
+  if (Game.shard === undefined) return "private";
+  if (Game.shard.name === "sim") return "sim";
+  return "world";
+}
+```
+
+**设计说明：**
+
+- `detectRuntimeEnvironment()` 替代了原 `detectEnvironmentBootstrap` 生命周期阶段的全部职责
+- 原 Flag guidance 系统（200+ 行）被删除——v2.0 的 HighCommand OrderBootstrap 接管冷启动引导
+- `computeBudgetLevel()` 从 HighCommand 私有方法提升为 `runtime/services.ts` 的模块级纯函数
+- HighCommand 不再需要持有 `budgetConfig` 字段——配置由 `createRuntimeServices` 内部管理
+
+---
+
 ## 4. computeBudgetLevel() 完整逻辑（D-08、D-11）
 
 ### 4.1 完整实现（Phase 9 定义，D-11 要求）
 
-以下为完整实现，可直接复制到 `src/highCommand/HighCommand.ts`（D-11：Phase 9 定义计算本 tick 预算等级的逻辑）。
+以下为纯函数实现，在 `createRuntimeServices()` 中调用，计算结果作为 `RuntimeServices.cpuBudget` 字段传入 HighCommand.tick()。
 
-**HighCommand 中需新增配置字段：**
-```typescript
-/** CPU 预算阈值配置，默认使用 DEFAULT_CPU_BUDGET_CONFIG（Phase 11 可注入自定义配置）*/
-private readonly budgetConfig: ICpuBudgetConfig = DEFAULT_CPU_BUDGET_CONFIG;
-```
+**位置：** `src/runtime/services.ts`（RuntimeServices 创建逻辑的一部分）
 
 ```typescript
+import { CpuBudgetLevel, DEFAULT_CPU_BUDGET_CONFIG } from "shared/constants/cpu";
+import type { ICpuBudgetConfig } from "shared/interfaces";
+
 /**
  * 计算本 tick 的 CPU 预算等级，基于当前 bucket 水位。
- * 只读取 Game.cpu.bucket，不产生副作用。
- * @param services - 本 tick 运行时服务（用于 logger 记录异常水位）
+ * 纯函数，只读取 Game.cpu.bucket，不产生副作用。
+ * 在 createRuntimeServices() 中调用，结果存入 services.cpuBudget。
+ * @param config - CPU 预算阈值配置（默认 DEFAULT_CPU_BUDGET_CONFIG）
  * @returns 本 tick 适用的 CpuBudgetLevel
  */
-private computeBudgetLevel(services: RuntimeServices): CpuBudgetLevel {
+export function computeBudgetLevel(
+  config: ICpuBudgetConfig = DEFAULT_CPU_BUDGET_CONFIG
+): CpuBudgetLevel {
   const bucket = Game.cpu.bucket;
 
-  if (bucket < this.budgetConfig.criticalThreshold) {
+  if (bucket < config.criticalThreshold) {
     return CpuBudgetLevel.Critical;   // bucket < 500：极低水位，仅执行最小集（D-10）
   }
-  if (bucket < this.budgetConfig.lowThreshold) {
+  if (bucket < config.lowThreshold) {
     return CpuBudgetLevel.Low;        // bucket < 2500：偏低水位，截断低优先级 TF（D-07）
   }
-  if (bucket > this.budgetConfig.surplusThreshold) {
+  if (bucket > config.surplusThreshold) {
     return CpuBudgetLevel.Surplus;    // bucket > 8000：充足水位，可执行密集任务
   }
   return CpuBudgetLevel.Normal;       // bucket 2500–8000：正常水位，完整执行
@@ -169,8 +233,8 @@ private computeBudgetLevel(services: RuntimeServices): CpuBudgetLevel {
 
 - 输入：`Game.cpu.bucket`（当前 bucket 水位，范围 0–10000）
 - 输出：`CpuBudgetLevel`（四个离散等级之一）
-- 副作用：无——只读取 `Game.cpu.bucket`，不修改任何状态
-- 参数 `services` 仅用于记录异常水位日志（如 bucket 意外归零时通过 `services.logger` 发出警告）
+- 副作用：无——纯函数，只读取 `Game.cpu.bucket`，不修改任何状态
+- 调用时机：`createRuntimeServices()` 内部，每 tick 调用一次，结果存入 `services.cpuBudget`
 
 ### 4.2 比较顺序说明
 
@@ -203,13 +267,13 @@ else                           → CpuBudgetLevel.Normal
 >
 > **结论：** `computeBudgetLevel()` 无需针对 Simulation 做特殊处理。
 
-### 4.5 在 tick() 中的调用点
+### 4.5 在 tick() 中的使用方式
 
-`computeBudgetLevel()` 在 `HighCommand.tick()` 中的调用时序（见 KERN-01 §4）：
+`services.cpuBudget` 在 `HighCommand.tick()` 中的使用（见 KERN-01 §4）：
 
 ```typescript
-// build 或 refresh 成功后：
-const budgetLevel = this.computeBudgetLevel(services);
+// build 或 refresh 成功后，直接从 services 读取预算等级：
+const budgetLevel = services.cpuBudget;
 
 if (budgetLevel === CpuBudgetLevel.Critical) {
   this.runMinimalSet(services);  // 熔断：最小集（D-10）
@@ -299,7 +363,7 @@ const sample = services.profiler.endStage(record.ref);
 | CpuBudgetLevel 数据结构 | CpuBudgetLevel as const | — |
 | ICpuBudgetConfig 阈值接口 | 接口定义 + 推荐值 | — |
 | DEFAULT_CPU_BUDGET_CONFIG | 默认配置常量 | — |
-| computeBudgetLevel() 完整实现 | 方法签名 + 完整逻辑（D-11） | — |
+| computeBudgetLevel() 纯函数 | 完整实现（runtime/services.ts） | — |
 | WatchdogRecord 数据结构 | 接口定义 | — |
 | IWatchdogConfig 配置接口 | 接口定义 + 推荐值 | — |
 | TaskForce 截断 for 循环 | — | Intel 调度器按优先级截断 |

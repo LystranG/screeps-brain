@@ -19,8 +19,7 @@ Screeps loop (main.ts)
         |
         v
    Kernel.run()
-   [refreshServices] --> RuntimeServices (logger, profiler)
-   [detectEnvironmentBootstrap] --> RuntimeEnvironmentMetadata
+   [refreshServices] --> RuntimeServices (logger, profiler, environment, cpuBudget)
    [highCommandTick]
         |
         v
@@ -69,14 +68,14 @@ Screeps loop (main.ts)
 ### 2.1 扩展前（当前 v2.0 骨架）
 
 ```typescript
-// src/runtime/lifecycle.ts — 当前骨架
+// src/runtime/lifecycle.ts — 当前骨架（Phase 9 前）
 export type LifecycleStageName =
   | "refreshServices"
-  | "detectEnvironmentBootstrap";
+  | "detectEnvironmentBootstrap";  // Phase 9 后删除，合并入 refreshServices
 
 export const KERNEL_LIFECYCLE_STAGES: LifecycleStage[] = [
   { name: "refreshServices", run(context) { ... } },
-  { name: "detectEnvironmentBootstrap", run: runEnvironmentBootstrapStage }
+  { name: "detectEnvironmentBootstrap", run: runEnvironmentBootstrapStage }  // 将被删除
 ];
 ```
 
@@ -84,15 +83,13 @@ export const KERNEL_LIFECYCLE_STAGES: LifecycleStage[] = [
 
 ```typescript
 // src/runtime/lifecycle.ts — Phase 9 扩展后
-import type { HighCommand } from "highCommand";  // 注意：lifecycle.ts 需要 import HighCommand
+import type { HighCommand } from "highCommand";
 
 export type LifecycleStageName =
   | "refreshServices"
-  | "detectEnvironmentBootstrap"
   | "highCommandTick";   // Phase 9 新增（KERN-03）
+// detectEnvironmentBootstrap 已合并入 refreshServices（见 KERN-02 §3.4）
 
-// 重构为工厂函数：lifecycle.ts 接收 highCommand 实例参数
-// 原因：KERNEL_LIFECYCLE_STAGES 是静态数组，无法捕获 Kernel 实例字段
 /**
  * 创建生命周期阶段列表。
  * 接受 highCommand 参数，使 highCommandTick 阶段可以通过闭包访问实例（D-03）。
@@ -101,23 +98,17 @@ export type LifecycleStageName =
 export function createLifecycleStages(highCommand: HighCommand): LifecycleStage[] {
   return [
     {
-      // 基于 Memory 配置创建本 tick 的 logger / profiler / 环境服务。
+      // 创建本 tick 运行时服务：logger、profiler、环境检测、cpuBudget 计算。
+      // 原 detectEnvironmentBootstrap 的环境检测职责已合并于此。
       name: "refreshServices",
       run(context: RuntimeLifecycleContext): void {
         context.services = createRuntimeServices(context.memory, context.game);
       }
     },
     {
-      // 检测运行环境（sim/world/private）并执行 sim 引导 guidance。
-      name: "detectEnvironmentBootstrap",
-      run: runEnvironmentBootstrapStage
-    },
-    {
       // 驱动 HighCommand 完整 tick（build/refresh + init/run）。
       name: "highCommandTick",
       run(context: RuntimeLifecycleContext): void {
-        // Kernel 已确保前序阶段成功（refreshServices + detectEnvironmentBootstrap）
-        // requireServices() 在此处安全可用
         highCommand.tick(context.requireServices());
       }
     }
@@ -127,19 +118,21 @@ export function createLifecycleStages(highCommand: HighCommand): LifecycleStage[
 // KERNEL_STAGE_ORDER 必须为显式静态数组（工厂函数重构后无法从 .map() 派生）
 ```
 
-**重要说明：** 此次重构将导出从 `KERNEL_LIFECYCLE_STAGES`（数组常量）改为 `createLifecycleStages()`（工厂函数）。Kernel.ts 必须更新调用方式，传入 `this.highCommand`。KERNEL_STAGE_ORDER 重新定义为显式静态数组（不再从 KERNEL_LIFECYCLE_STAGES.map() 派生）：
+**重要说明：**
+
+- 生命周期从 3 阶段简化为 2 阶段：`refreshServices` → `highCommandTick`
+- `detectEnvironmentBootstrap` 被删除——环境检测（`detectRuntimeEnvironment()`）合并入 `createRuntimeServices()`，只需几行代码（见 KERN-02 §3.4）
+- 原 Flag guidance 系统（200+ 行 simBootstrap 状态机）被删除——v2.0 的 HighCommand OrderBootstrap 接管冷启动引导
+- `KERNEL_STAGE_ORDER` 同步更新为 2 元素数组
 
 ```typescript
 /**
  * 阶段执行顺序（显式静态数组）。
  * 工厂函数 createLifecycleStages() 需要 HighCommand 实例参数，
  * 无法在模块加载时调用，因此不能用 .map() 动态派生。
- * TypeScript 的 LifecycleStageName union 确保拼写错误产生编译错误，
- * 但顺序一致性需手动维护。
  */
 export const KERNEL_STAGE_ORDER: LifecycleStageName[] = [
   "refreshServices",
-  "detectEnvironmentBootstrap",
   "highCommandTick"
 ];
 ```
@@ -627,7 +620,6 @@ export const KERNEL_STAGE_ORDER = KERNEL_LIFECYCLE_STAGES.map(stage => stage.nam
 // ✅ 正确：显式静态数组，手动维护顺序一致性
 export const KERNEL_STAGE_ORDER: LifecycleStageName[] = [
   "refreshServices",
-  "detectEnvironmentBootstrap",
   "highCommandTick"
 ];
 ```

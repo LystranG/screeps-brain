@@ -168,7 +168,7 @@ public tick(services: RuntimeServices): void {
     (global as Record<string, unknown>)._lastTick = Game.time;
   }
 
-  const budgetLevel = this.computeBudgetLevel(services);
+  const budgetLevel = services.cpuBudget;
 
   if (budgetLevel === CpuBudgetLevel.Critical) {
     this.runMinimalSet(services);
@@ -237,11 +237,11 @@ export type LifecycleStageName =
   | "refreshServices"
   | "detectEnvironmentBootstrap";
 
-// 扩展后（Phase 9 新增）：
+// 扩展后（Phase 9）：
 export type LifecycleStageName =
   | "refreshServices"
-  | "detectEnvironmentBootstrap"
   | "highCommandTick";   // Phase 9 新增（KERN-01/KERN-03）
+// detectEnvironmentBootstrap 合并入 refreshServices（环境检测 + cpuBudget 计算）
 ```
 
 **`KERNEL_LIFECYCLE_STAGES` 追加第三个阶段：**
@@ -260,22 +260,16 @@ import type { HighCommand } from "highCommand";
 export function createLifecycleStages(highCommand: HighCommand): LifecycleStage[] {
   return [
     {
-      // 基于 Memory 配置创建本 tick 的 logger / profiler / 环境服务。
+      // 创建本 tick 的运行时服务：logger、profiler、环境检测、cpuBudget 计算。
       name: "refreshServices",
       run(context: RuntimeLifecycleContext): void {
         context.services = createRuntimeServices(context.memory, context.game);
       }
     },
     {
-      // 检测运行环境（sim/world/private）并执行 sim 引导 guidance。
-      name: "detectEnvironmentBootstrap",
-      run: runEnvironmentBootstrapStage
-    },
-    {
       // 驱动 HighCommand 完整 tick（build/refresh + init/run）。
       name: "highCommandTick",
       run(context: RuntimeLifecycleContext): void {
-        // 确保 services 已初始化（profiler/logger 可用）
         const services = context.requireServices();
         highCommand.tick(services);
       }
@@ -285,7 +279,7 @@ export function createLifecycleStages(highCommand: HighCommand): LifecycleStage[
 
 // 同时保留 KERNEL_LIFECYCLE_STAGES 导出的向后兼容（测试中使用的静态列表）：
 export const KERNEL_LIFECYCLE_STAGES: LifecycleStage[] = [
-  // ... 保留旧两个阶段，用于现有测试兼容
+  // ... 保留旧阶段，用于现有测试兼容（不含 detectEnvironmentBootstrap）
 ];
 ```
 
@@ -320,7 +314,6 @@ private createLifecycleStages(): LifecycleStage[] {
 | `init(services: RuntimeServices): void` | private | 驱动 Intel.init() → TaskForce.init() → Garrison.init() |
 | `run(services: RuntimeServices): void` | private | 驱动 Intel.run() → TaskForce.run() → Garrison.run() |
 | `runMinimalSet(services: RuntimeServices): void` | private | 熔断模式：只执行 refresh + spawn 基础设施（D-10）|
-| `computeBudgetLevel(services: RuntimeServices): CpuBudgetLevel` | private | 计算本 tick CPU 预算等级（见 KERN-02）|
 | `rebuildCache(): void` | private | Cache 索引完全重建（见 KERN-04）|
 
 **ITaskForceRegistry 实现说明：**
