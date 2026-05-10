@@ -24,7 +24,7 @@ module.exports = {
       "@typescript-eslint/parser": [".ts", ".tsx"]
     },
     "import/resolver": {
-      typescript: {}
+      typescript: { project: "./tsconfig.json" }
     }
   },
   rules: {
@@ -84,5 +84,27 @@ module.exports = {
     radix: "error",
     "sort-imports": "warn",
     "spaced-comment": "error",
+
+    // SPEC-03: 循环依赖检测（D-07）
+    // maxDepth: 10 限制遍历深度以控制 lint 性能；ignoreExternal 忽略 node_modules
+    "import/no-cycle": ["error", { "maxDepth": 10, "ignoreExternal": true }],
+
+    // SPEC-03: 强制 barrel-only 访问，禁止绕过 index.ts 直接引用内部实现（D-05）
+    // 模式说明：highCommand/*/!(index) 匹配除 index.ts 外的所有二级子路径，以此类推
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "highCommand/*/!(index)",
+              "highCommand/*/*/!(index)",
+              "highCommand/*/*/*/!(index)"
+            ],
+            "message": "Import from the domain barrel (index.ts) only. Direct internal imports are forbidden."
+          }
+        ]
+      }
+    ]
   }
 };
