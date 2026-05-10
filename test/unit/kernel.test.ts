@@ -6,17 +6,11 @@ import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame, createMockMemory, mockGame, mockMemory } from "./mock";
 
 describe("kernel lifecycle", () => {
+  // v2.0 骨架生命周期：仅保留服务初始化和环境检测阶段。
   const expectedStageOrder: LifecycleStageName[] = [
     "refreshServices",
-    "installCommands",
-    "detectEnvironmentBootstrap",
-    "cleanup"
+    "detectEnvironmentBootstrap"
   ];
-
-  interface KernelCommandGlobalState {
-    cmd?: { help(): string };
-    __cmdApiVersion?: number;
-  }
 
   let consoleLog: sinon.SinonStub | null = null;
 
@@ -25,8 +19,6 @@ describe("kernel lifecycle", () => {
     global.Game = createMockGame();
     // @ts-ignore : allow adding Memory to global
     global.Memory = createMockMemory();
-    delete (global as unknown as KernelCommandGlobalState).cmd;
-    delete (global as unknown as KernelCommandGlobalState).__cmdApiVersion;
   });
 
   afterEach(() => {
@@ -34,8 +26,6 @@ describe("kernel lifecycle", () => {
       consoleLog.restore();
       consoleLog = null;
     }
-    delete (global as unknown as KernelCommandGlobalState).cmd;
-    delete (global as unknown as KernelCommandGlobalState).__cmdApiVersion;
   });
 
   it("executes lifecycle stages in the required order", () => {
@@ -70,8 +60,8 @@ describe("kernel lifecycle", () => {
     for (const stageName of KERNEL_STAGE_ORDER) {
       stages[stageName] = () => {
         observedStages.push(stageName);
-        if (stageName === "installCommands") {
-          throw new Error("command install failed");
+        if (stageName === "detectEnvironmentBootstrap") {
+          throw new Error("environment bootstrap failed");
         }
       };
     }
@@ -81,11 +71,11 @@ describe("kernel lifecycle", () => {
     assert.isFalse(result.ok);
     assert.deepEqual(result.executedStages, expectedStageOrder);
     assert.deepEqual(observedStages, expectedStageOrder);
-    assert.deepEqual(result.failures, [{ stage: "installCommands", message: "command install failed" }]);
-    assert.isTrue(consoleLog!.calledWith("Kernel stage installCommands failed: command install failed"));
+    assert.deepEqual(result.failures, [{ stage: "detectEnvironmentBootstrap", message: "environment bootstrap failed" }]);
+    assert.isTrue(consoleLog!.calledWith("Kernel stage detectEnvironmentBootstrap failed: environment bootstrap failed"));
   });
 
-  it("runs the integrated lifecycle with services, commands, environment, and cleanup", () => {
+  it("runs the integrated lifecycle with services and environment detection", () => {
     const game = mockGame();
     const memory = mockMemory();
 
@@ -97,26 +87,7 @@ describe("kernel lifecycle", () => {
 
     assert.isTrue(result.ok);
     assert.deepEqual(result.executedStages, expectedStageOrder);
-    assert.exists((global as unknown as KernelCommandGlobalState).cmd);
-    assert.isString((global as unknown as KernelCommandGlobalState).cmd?.help());
     assert.equal(memory.runtime.environment.type, "world");
     assert.equal(memory.runtime.environment.shard, "shard0");
-  });
-
-  it("runs dead creep memory cleanup in the cleanup stage", () => {
-    consoleLog = sinon.stub(console, "log");
-    const memory = mockMemory();
-    const game = mockGame();
-    game.shard.name = "shard0";
-    Object.assign(memory, createDefaultProjectMemorySections());
-    memory.creeps.persistValue = "any value";
-    memory.creeps.notPersistValue = "any value";
-    game.creeps.persistValue = "any value";
-
-    new Kernel().run();
-
-    assert.isDefined(memory.creeps.persistValue);
-    assert.isUndefined(memory.creeps.notPersistValue);
-    assert.isTrue(consoleLog!.calledOnceWith("Cleaned up 1 stale creep memory entries"));
   });
 });

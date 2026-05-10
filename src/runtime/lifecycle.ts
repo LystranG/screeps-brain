@@ -1,15 +1,10 @@
 import { RuntimeServices, createRuntimeServices } from "runtime/services";
-import { runCleanupStage } from "cleanup/lifecycle";
-import { runCommandInstallStage } from "commands/lifecycle";
 import { runEnvironmentBootstrapStage } from "environment/lifecycle";
 
-// 当前精简后的生命周期阶段：服务初始化 → 命令安装 → 环境检测 → 清理。
-// 后续重构阶段（build / refresh / init / run / postRun）将在此扩展。
+// 当前 v2.0 骨架生命周期：服务初始化 → 环境检测。HighCommand 将在 Phase 9 作为新阶段接入。
 export type LifecycleStageName =
   | "refreshServices"
-  | "installCommands"
-  | "detectEnvironmentBootstrap"
-  | "cleanup";
+  | "detectEnvironmentBootstrap";
 
 export interface RuntimeLifecycleContext {
   memory: Memory;
@@ -34,19 +29,9 @@ export const KERNEL_LIFECYCLE_STAGES: LifecycleStage[] = [
     }
   },
   {
-    // 安装或复用版本化的 Screeps 控制台命令入口 global.cmd。
-    name: "installCommands",
-    run: runCommandInstallStage
-  },
-  {
     // 检测运行环境（sim/world/private）并执行 sim 引导 guidance。
     name: "detectEnvironmentBootstrap",
     run: runEnvironmentBootstrapStage
-  },
-  {
-    // tick 末尾清理死亡 creep 的残留 Memory。
-    name: "cleanup",
-    run: runCleanupStage
   }
 ];
 

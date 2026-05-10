@@ -1,5 +1,5 @@
 import { assert } from "chai";
-import { RuntimeEnvironment } from "constants/runtime";
+import { RuntimeEnvironment } from "shared/constants/runtime";
 import { detectRuntimeEnvironment, updateRuntimeEnvironmentSummary } from "environment/detection";
 import { createDefaultProjectMemorySections } from "memory/schema";
 import { createMockGame } from "./mock";
