@@ -34,7 +34,7 @@ function createLoggerConfig(config?: ObservabilityConfigMemory): LoggerConfig {
 
   const enabledNamespaces: LoggerConfig["enabledNamespaces"] = {};
 
-  Object.keys(config.enabledNamespaces).forEach(namespace => {
+  Object.keys(config.enabledNamespaces ?? {}).forEach(namespace => {
     enabledNamespaces[namespace] = config.enabledNamespaces[namespace]?.enabled;
   });
 
