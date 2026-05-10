@@ -2,7 +2,7 @@ import { Logger, LoggerConfig } from "logging/Logger";
 import { ObservabilityConfigMemory } from "memory/schema";
 import { Profiler } from "profiling/Profiler";
 import { RuntimeEnvironmentMetadata } from "environment/detection";
-import { ShardName } from "constants/runtime";
+import { ShardName } from "shared/constants/runtime";
 
 // 每 tick 创建的运行时服务包，避免业务模块直接读取 Memory 或 Screeps 全局。
 export interface RuntimeServices {

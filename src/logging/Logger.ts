@@ -1,4 +1,4 @@
-import { LogLevel } from "constants/runtime";
+import { LogLevel } from "shared/constants/runtime";
 
 export type LogLevelName = LogLevel;
 

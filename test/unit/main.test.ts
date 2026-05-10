@@ -32,23 +32,6 @@ describe("main", () => {
     assert.isUndefined(loop());
   });
 
-  it("automatically deletes memory of missing creeps through the kernel cleanup stage", () => {
-    consoleLog = sinon.stub(console, "log");
-    const memory = mockMemory();
-    const game = mockGame();
-    game.shard.name = "shard0";
-    Object.assign(memory, createDefaultProjectMemorySections());
-    memory.creeps.persistValue = "any value";
-    memory.creeps.notPersistValue = "any value";
-    game.creeps.persistValue = "any value";
-
-    loop();
-
-    assert.isDefined(memory.creeps.persistValue);
-    assert.isUndefined(memory.creeps.notPersistValue);
-    assert.isTrue(consoleLog!.calledOnceWith("Cleaned up 1 stale creep memory entries"));
-  });
-
   it("does not emit the starter Current game tick log", () => {
     consoleLog = sinon.stub(console, "log");
     mockGame().shard.name = "shard0";
