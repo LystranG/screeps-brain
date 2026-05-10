@@ -81,11 +81,12 @@ export class Logger {
 
   private samplingPermits(namespace: string): boolean {
     const sampleRate = this.config.namespaceSampling?.[namespace];
+    const flooredRate = sampleRate !== undefined ? Math.floor(sampleRate) : 0;
 
-    if (sampleRate === undefined || !Number.isFinite(sampleRate) || sampleRate <= 1) {
-      return true;
+    if (flooredRate < 2) {
+      return true; // rate too low to sample, always permit
     }
 
-    return this.tickProvider() % Math.floor(sampleRate) === 0;
+    return this.tickProvider() % flooredRate === 0;
   }
 }
