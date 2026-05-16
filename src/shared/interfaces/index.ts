@@ -1,3 +1,2 @@
-// 跨域接口契约的唯一导出口（barrel）。Phase 9+ 阶段填充具体接口定义。
-// 此文件当前为骨架，无实际导出。
-export {};
+// 跨域接口契约的唯一导出口（barrel）。Phase 10 填充了 ICacheable 接口。
+export type { ICacheable } from "./ICacheable";
