@@ -49,16 +49,31 @@ export interface ISegmenter {
 }
 
 /**
- * MemProxy 接口（占位声明，完整定义见 MEM-02）。
- * 包装大型 Memory 数据结构，提供 L2/L3 透明读写。
- * @template T - 被包装的数据类型
+ * MemProxy 接口：包装大型 Memory 数据结构，提供 L2/L3 透明读写（D-05、D-06）。
+ * 调用方无需知道数据存在哪一层（L2 Memory 或 L3 Segment）。
+ * 实现类：MemProxy（src/runtime/memory/MemProxy.ts，MEM-02）。
+ * @template T - 被包装的数据类型，必须为对象类型
  */
 export interface IMemProxy<T extends object> {
-  /** 读取数据。segment 未激活时返回 Pending{ready:false}（完整定义见 MEM-02）。*/
+  /**
+   * 读取数据。segment 未激活时返回 Pending{ready:false}。
+   * 调用方必须用 isPending() 检查返回值后再使用（D-09 语义传递）。
+   * 调用方模式：`const result = proxy.get(); if (isPending(result)) return;`
+   * @returns 数据对象，或 Pending 标记（segment 未激活时）
+   */
   get(): T | Pending;
-  /** 写入数据。标记脏位，数据在 flush() 时写回 segment（完整定义见 MEM-02）。*/
+
+  /**
+   * 写入数据。只标记脏位，数据在 flush() 时写回 segment（D-07 tick 末统一写回）。
+   * 不立即写回，避免 tick 中途频繁 I/O。
+   * @param value - 要写入的数据对象
+   */
   set(value: T): void;
-  /** tick 末写回所有脏 segment（完整定义见 MEM-02）。*/
+
+  /**
+   * tick 末写回所有脏 segment。只能由 Kernel 的 memoryFlush 阶段调用，业务代码严禁调用。
+   * 在 tick 中途调用会导致数据不一致（Pitfall #4 防护）。
+   */
   flush(): void;
 }
 
